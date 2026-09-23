@@ -1,0 +1,18 @@
+{
+  "name": "전차 조립 플래너",
+  "short_name": "전차 플래너",
+  "description": "숙제를 완료할 때마다 부품이 붙어 한 달에 전차 한 대를 완성하는 숙제 플래너",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#6f6a62",
+  "theme_color": "#6f6a62",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

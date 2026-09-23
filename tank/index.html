@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>전차 조립 플래너</title>
+<meta name="theme-color" content="#6f6a62">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+  :root {
+    --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+    --panel: rgba(30, 28, 25, .72); --card: #f4efe4; --ink: #1f1d1a; --muted: #6b665d;
+    --accent: #ffd447; --ok: #4caf7d;
+    --c-gun: #d9534f; --c-engine: #f0932b; --c-radio: #3b82f6; --c-armor: #22a06b; --c-misc: #8e7cc3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #6f6a62; }
+  body {
+    font: 17px/1.4 system-ui, -apple-system, "Noto Sans KR", sans-serif; color: var(--ink);
+    overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  /* ---------- 공통 ---------- */
+  .screen { position: fixed; inset: 0; display: none; pointer-events: none; }
+  .screen.on { display: block; }
+  .screen > * { pointer-events: auto; }
+  .btn {
+    min-height: 52px; min-width: 52px; padding: 0 22px; border: 0; border-radius: 14px;
+    background: var(--accent); color: var(--ink); font-weight: 700; font-size: 18px;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.ghost { background: rgba(255,255,255,.9); }
+  .pcard .btn.ghost { border: 2px solid #d8d1c2; }
+  .btn:disabled { opacity: .45; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+    font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap;
+  }
+  .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.85); }
+  .m-gun { background: var(--c-gun); } .m-engine { background: var(--c-engine); }
+  .m-radio { background: var(--c-radio); } .m-armor { background: var(--c-armor); } .m-misc { background: var(--c-misc); }
+
+  /* ---------- 전차 선택 ---------- */
+  #screen-select { background: rgba(40, 38, 34, .55); display: none; }
+  #screen-select.on { display: flex; flex-direction: column; }
+  #screen-select h1 { margin: calc(var(--sat) + 22px) 24px 6px; color: #fff; font-size: 26px; }
+  #screen-select p.sub { margin: 0 24px 14px; color: rgba(255,255,255,.8); }
+  #tank-list {
+    flex: 1; display: flex; gap: 16px; padding: 8px 24px calc(var(--sab) + 24px);
+    overflow: auto; align-items: stretch;
+  }
+  .tank-card {
+    flex: 1 1 0; min-width: 200px; background: var(--card); border-radius: 20px; padding: 18px;
+    display: flex; flex-direction: column; gap: 10px; border: 3px solid transparent; text-align: left;
+  }
+  .tank-card.selected { border-color: var(--accent); }
+  .tank-card .thumb { height: 120px; border-radius: 12px; background: #d8d1c2; display: grid; place-items: center; overflow: hidden; }
+  .tank-card .thumb svg { width: 88%; height: 88%; }
+  .tank-card.locked .thumb svg { opacity: .35; filter: grayscale(1); }
+  .tank-card h2 { margin: 4px 0 0; font-size: 21px; }
+  .tank-card .desc { color: var(--muted); font-size: 15px; }
+  .tank-card .note { margin-top: auto; font-size: 14px; font-weight: 700; color: #a3551f; }
+  #select-actions { display: flex; justify-content: flex-end; padding: 0 24px calc(var(--sab) + 20px); }
+
+  /* ---------- 차고(홈) ---------- */
+  #screen-garage.on { display: grid; }
+  #screen-garage {
+    grid-template-columns: 1fr 380px; grid-template-rows: 1fr;
+    padding: var(--sat) var(--sar) var(--sab) var(--sal);
+  }
+  #stage-area { position: relative; }
+  #tank-label {
+    position: absolute; left: 20px; top: 16px; background: var(--panel); color: #fff;
+    padding: 8px 14px; border-radius: 12px; font-weight: 700; font-size: 16px;
+  }
+  #tank-label small { display: block; font-weight: 400; opacity: .8; font-size: 13px; }
+  #toast {
+    position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(20px);
+    background: var(--card); padding: 12px 20px; border-radius: 14px; font-weight: 700;
+    opacity: 0; transition: .25s; pointer-events: none; white-space: nowrap; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.grey { background: #cfcac0; }
+  #panel {
+    background: var(--panel); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 14px; overflow: auto;
+  }
+  #panel h2 { margin: 0; color: #fff; font-size: 20px; display: flex; justify-content: space-between; align-items: baseline; }
+  #panel h2 span { font-size: 14px; font-weight: 400; opacity: .8; }
+  .mission {
+    background: var(--card); border-radius: 18px; padding: 14px 14px 14px 16px;
+    display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 6px 12px; align-items: center;
+  }
+  .mission .title { font-size: 19px; font-weight: 700; grid-column: 1; }
+  .mission .meta { grid-column: 1; display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+  .mission .act { grid-column: 2; grid-row: 1 / span 2; }
+  .mission.doing { outline: 3px solid var(--accent); }
+  .mission.done { opacity: .55; }
+  .mission.done .act { background: var(--ok); color: #fff; }
+  #progress { background: var(--card); border-radius: 18px; padding: 14px 16px; }
+  #progress .row { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 8px; }
+  #progress .row small { font-weight: 400; color: var(--muted); }
+  #bar { height: 14px; border-radius: 999px; background: #d8d1c2; overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 999px; transition: width .4s; }
+  #parts-count { color: rgba(255,255,255,.85); font-size: 14px; text-align: center; }
+  #panel-actions { display: flex; gap: 10px; margin-top: auto; }
+  #panel-actions { flex-wrap: wrap; }
+  #panel-actions .btn { flex: 1 1 45%; font-size: 15px; padding: 0 10px; }
+
+  /* 세로 화면: 전차 위, 미션 아래 */
+  @media (orientation: portrait) {
+    #screen-garage { grid-template-columns: 1fr; grid-template-rows: 44% 1fr; }
+    #tank-list { flex-direction: column; }
+    .tank-card { min-height: 0; }
+    .tank-card .thumb { height: 90px; }
+  }
+
+  /* ---------- 집중 모드 ---------- */
+  #screen-focus { background: #2b2925; }
+  #screen-focus.on { display: flex; align-items: center; justify-content: center; }
+  #focus-wrap {
+    width: min(92vw, 640px); display: flex; flex-direction: column; align-items: center; gap: 18px;
+    padding: calc(var(--sat) + 16px) 16px calc(var(--sab) + 16px); text-align: center; color: #fff;
+  }
+  #focus-title { margin: 0; font-size: 30px; }
+  #focus-timer {
+    font: 700 min(28vw, 150px)/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums; color: var(--accent);
+  }
+  #focus-timer.over { color: var(--ok); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.04); } }
+  #focus-hint { color: rgba(255,255,255,.75); font-size: 17px; min-height: 1.4em; }
+  #focus-actions { display: flex; gap: 14px; margin-top: 6px; }
+  #focus-durations { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #focus-durations button {
+    min-width: 88px; min-height: 60px; border: 2px solid rgba(255,255,255,.3); border-radius: 16px;
+    background: rgba(255,255,255,.08); color: #fff; font-size: 22px; font-weight: 700;
+  }
+  #focus-durations button.on { background: var(--accent); color: var(--ink); border-color: var(--accent); }
+  #screen-focus.ready #focus-timer { opacity: .35; }
+  #screen-focus:not(.ready) #focus-durations, #screen-focus:not(.ready) #btn-start { display: none; }
+  #screen-focus.ready #btn-done { display: none; }
+  #focus-actions .btn { min-height: 64px; padding: 0 34px; font-size: 21px; }
+  #focus-snap {
+    position: fixed; right: max(14px, var(--sar)); bottom: max(14px, var(--sab)); width: 150px; height: 100px;
+    object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: #6f6a62;
+  }
+  @media (orientation: portrait) { #focus-snap { width: 120px; height: 80px; } }
+  /* 결합 순간 화면 번쩍임 */
+  #stage-area::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at 45% 55%, rgba(255,230,140,.55), rgba(255,230,140,0) 60%);
+  }
+  #stage-area.flash::after { animation: flash .5s ease-out; }
+  @keyframes flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ---------- 꾸미기 · 차고 목록 · 완성 연출 ---------- */
+  #screen-decor.on { display: grid; }
+  #screen-decor { grid-template-columns: 1fr 380px; padding: var(--sat) var(--sar) var(--sab) var(--sal); }
+  @media (orientation: portrait) { #screen-decor { grid-template-columns: 1fr; grid-template-rows: 44% 1fr; } }
+  #decor-panel { background: var(--panel); backdrop-filter: blur(6px); padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+  #decor-panel h2 { margin: 0; color: #fff; font-size: 20px; }
+  .dsec { background: var(--card); border-radius: 16px; padding: 12px 14px; }
+  .dsec h3 { margin: 0 0 8px; font-size: 15px; color: var(--muted); display: flex; justify-content: space-between; }
+  .dsec.locked { opacity: .5; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+  .sw { width: 64px; height: 64px; border-radius: 14px; border: 3px solid transparent; padding: 0; overflow: hidden; background: #ddd; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+  .sw.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ink); }
+  .sw canvas, .sw svg { width: 100%; height: 100%; display: block; }
+  #num-row { display: flex; align-items: center; gap: 10px; }
+  #num-val { font: 700 28px ui-monospace, monospace; letter-spacing: .1em; min-width: 80px; }
+  #num-pad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+  #num-pad button { min-height: 48px; border: 2px solid #d8d1c2; border-radius: 10px; background: #fff; font-size: 18px; font-weight: 700; }
+  #decor-actions { display: flex; gap: 10px; margin-top: auto; }
+  #decor-actions .btn { flex: 1; }
+
+  #screen-list { background: #eeeae0; }
+  #screen-list.on { display: flex; flex-direction: column; }
+  #list-head { display: flex; align-items: center; gap: 10px; padding: calc(var(--sat) + 10px) 16px 10px; background: #2b2925; color: #fff; }
+  #list-head h1 { margin: 0; font-size: 20px; flex: 1; }
+  #list-body { flex: 1; overflow: auto; padding: 16px; }
+  #list-body h3 { margin: 12px 0 8px; font-size: 16px; color: var(--muted); }
+  .gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .gcard { background: #fff; border-radius: 16px; padding: 12px; text-align: left; border: 0; display: flex; flex-direction: column; gap: 6px; min-height: 48px; }
+  .gcard .gthumb { height: 110px; border-radius: 10px; background: #d8d1c2; display: grid; place-items: center; overflow: hidden; }
+  .gcard .gthumb img { width: 100%; height: 100%; object-fit: cover; }
+  .gcard .gthumb svg { width: 85%; height: 85%; }
+  .gcard.locked { opacity: .55; } .gcard.locked .gthumb svg { filter: grayscale(1) brightness(.4); }
+  .gcard b { font-size: 17px; } .gcard small { color: var(--muted); }
+  .chip { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,.2); }
+
+  #screen-cere { background: rgba(20, 18, 15, .35); }
+  #screen-cere.on { display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: calc(var(--sat) + 24px) 16px calc(var(--sab) + 20px); }
+  #cere-title { color: #fff; font-size: 40px; font-weight: 800; text-shadow: 0 4px 20px rgba(0,0,0,.5); text-align: center; margin: 0; }
+  #cere-sub { color: #fff; font-size: 20px; text-align: center; opacity: .9; }
+  #cere-bottom { display: flex; gap: 12px; align-items: flex-end; width: 100%; justify-content: center; }
+  @media (orientation: landscape) { #screen-cere.on { align-items: stretch; } #cere-bottom { justify-content: flex-end; } #cere-bottom:has(#spec-card:not(.on)) { justify-content: center; } }
+  #spec-card { background: var(--card); border-radius: 20px; padding: 18px 22px; width: min(92vw, 520px); box-shadow: 0 10px 40px rgba(0,0,0,.4); display: none; }
+  #spec-card.on { display: block; }
+  #spec-card h2 { margin: 0 0 4px; font-size: 26px; }
+  #spec-card .sub { color: var(--muted); margin-bottom: 12px; }
+  #spec-card table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  #spec-card td { padding: 6px 0; border-top: 1px solid #e6e0d3; } #spec-card td:first-child { color: var(--muted); width: 40%; }
+  #spec-card .badge-row { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #spec-card .medal { display: inline-block; padding: 6px 12px; border-radius: 999px; background: var(--accent); font-weight: 700; }
+  #cere-actions { display: flex; gap: 12px; justify-content: center; margin-top: 14px; }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  #cere-title.pop { animation: pop .6s cubic-bezier(.2,1.4,.4,1); }
+  #stage-chip { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.15); font-size: 12px; font-weight: 700; }
+
+  /* ---------- 부모 모드 ---------- */
+  #screen-pin { background: #2b2925; }
+  #screen-pin.on { display: flex; align-items: center; justify-content: center; }
+  #pin-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; color: #fff; padding: 16px; }
+  #pin-wrap h2 { margin: 0; font-size: 22px; }
+  #pin-dots { display: flex; gap: 14px; height: 24px; }
+  #pin-dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); }
+  #pin-dots i.on { background: var(--accent); border-color: var(--accent); }
+  #pin-msg { min-height: 1.4em; color: #ff9a8a; font-size: 15px; }
+  #pin-pad { display: grid; grid-template-columns: repeat(3, 84px); gap: 12px; }
+  #pin-pad button { height: 64px; border: 0; border-radius: 16px; background: rgba(255,255,255,.12); color: #fff; font-size: 26px; font-weight: 700; }
+  #pin-pad button.fn { font-size: 16px; background: rgba(255,255,255,.06); }
+  #pin-cancel { margin-top: 6px; }
+
+  #screen-parent { background: #eeeae0; }
+  #screen-parent.on { display: flex; flex-direction: column; }
+  #parent-head {
+    display: flex; align-items: center; gap: 10px; padding: calc(var(--sat) + 10px) 16px 10px;
+    background: #2b2925; color: #fff;
+  }
+  #parent-head h1 { margin: 0; font-size: 20px; flex: 1; }
+  #parent-tabs { display: flex; gap: 6px; padding: 10px 16px 0; background: #e2ddd1; overflow-x: auto; }
+  #parent-tabs button {
+    min-height: 48px; padding: 0 18px; border: 0; border-radius: 12px 12px 0 0; background: transparent;
+    font-weight: 700; font-size: 16px; color: var(--muted);
+  }
+  #parent-tabs button.on { background: #eeeae0; color: var(--ink); }
+  .ptab { display: none; flex: 1; overflow: auto; padding: 16px calc(var(--sar) + 16px) calc(var(--sab) + 16px) calc(var(--sal) + 16px); }
+  .ptab.on { display: block; }
+  .pcard { background: #fff; border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; }
+  .pcard h3 { margin: 0 0 10px; font-size: 17px; }
+  .row-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row-btns .btn { font-size: 16px; padding: 0 16px; }
+  select, input[type=text] {
+    min-height: 48px; font: inherit; font-size: 16px; padding: 0 12px; border: 2px solid #d8d1c2; border-radius: 10px; background: #fff; color: var(--ink);
+  }
+  .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg button { min-width: 56px; min-height: 48px; padding: 0 14px; border: 2px solid #d8d1c2; border-radius: 12px; background: #fff; font-weight: 700; font-size: 16px; }
+  .seg button.on { background: var(--accent); border-color: var(--accent); }
+  #day-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  #day-tabs button { flex: 1; min-height: 52px; border: 2px solid #d8d1c2; border-radius: 12px; background: #fff; font-weight: 700; font-size: 16px; }
+  #day-tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  #day-tabs button small { display: block; font-weight: 400; font-size: 12px; opacity: .7; }
+  .mrow { display: grid; grid-template-columns: 120px 1fr 96px 52px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .mrow .del { min-height: 48px; border: 0; border-radius: 10px; background: #f1d9d5; color: #a33; font-size: 20px; font-weight: 700; }
+  @media (max-width: 600px) { .mrow { grid-template-columns: 1fr 1fr; } .mrow input { grid-column: 1 / -1; } }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: #f7f3ea; border-radius: 12px; padding: 12px; text-align: center; }
+  .stat b { display: block; font-size: 28px; }
+  .stat small { color: var(--muted); }
+  .mbar { display: grid; grid-template-columns: 110px 1fr 70px; gap: 10px; align-items: center; margin: 8px 0; font-size: 15px; }
+  .mbar .track { height: 12px; border-radius: 999px; background: #e6e0d3; overflow: hidden; }
+  .mbar .track i { display: block; height: 100%; border-radius: 999px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  #file-import { display: none; }
+
+  /* ---------- 확인용 HUD (나중에 제거) ---------- */
+  #hud {
+    position: fixed; left: max(8px, var(--sal)); bottom: max(8px, var(--sab)); z-index: 5;
+    font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #fff;
+    background: rgba(0,0,0,.45); padding: 4px 8px; border-radius: 6px; pointer-events: none; white-space: pre;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">…</div>
+
+<!-- 전차 선택 (월초) -->
+<section id="screen-select" class="screen">
+  <h1>이번 달에 만들 전차</h1>
+  <p class="sub">초급 전차 중에서 한 대를 고르세요. 숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.</p>
+  <div id="tank-list"></div>
+  <div id="select-actions"><button id="btn-select" class="btn">이 전차로 시작</button></div>
+</section>
+
+<!-- 차고(홈) -->
+<section id="screen-garage" class="screen">
+  <div id="stage-area">
+    <div id="tank-label"><span id="tank-name"></span><small id="tank-sub"></small><span id="stage-chip"></span></div>
+    <div id="toast"></div>
+  </div>
+  <aside id="panel">
+    <h2>오늘 미션 <span id="today-str"></span></h2>
+    <div id="missions"></div>
+    <div id="progress">
+      <div class="row"><span>이번 주 진행</span><small id="progress-text"></small></div>
+      <div id="bar"><i></i></div>
+    </div>
+    <div id="parts-count"></div>
+    <div id="panel-actions">
+      <button id="btn-change" class="btn ghost">전차 바꾸기</button>
+      <button id="btn-decor" class="btn ghost">꾸미기</button>
+      <button id="btn-list" class="btn ghost">차고 목록</button>
+      <button id="btn-parent" class="btn ghost">부모</button>
+    </div>
+  </aside>
+</section>
+
+<!-- 집중 모드: 3D 정지, 타이머만 -->
+<section id="screen-focus" class="screen">
+  <div id="focus-wrap">
+    <span id="focus-badge" class="badge"></span>
+    <h1 id="focus-title"></h1>
+    <div id="focus-timer">20:00</div>
+    <div id="focus-durations"></div>
+    <div id="focus-hint"></div>
+    <div id="focus-actions">
+      <button id="btn-quit" class="btn ghost">나가기</button>
+      <button id="btn-start" class="btn">시작</button>
+      <button id="btn-done" class="btn">완료</button>
+    </div>
+  </div>
+  <img id="focus-snap" alt="">
+</section>
+
+<!-- 꾸미기 (도색·위장·마킹) -->
+<section id="screen-decor" class="screen">
+  <div></div>
+  <aside id="decor-panel">
+    <h2 id="decor-title">꾸미기</h2>
+    <div class="dsec" id="dsec-base"><h3>기본 도색 <span></span></h3><div class="swatches"></div></div>
+    <div class="dsec" id="dsec-camo"><h3>위장 무늬 <span></span></h3><div class="swatches"></div></div>
+    <div class="dsec" id="dsec-mark"><h3>마킹 <span></span></h3>
+      <div class="swatches" id="mark-sw"></div>
+      <div id="num-row" style="margin-top:10px"><span>차체 번호</span><span id="num-val">---</span><button class="btn ghost" id="num-clear" style="min-height:44px">지움</button></div>
+      <div id="num-pad"></div>
+    </div>
+    <div id="decor-actions"><button id="btn-decor-close" class="btn">완료</button></div>
+  </aside>
+</section>
+
+<!-- 차고 목록 (도감) -->
+<section id="screen-list" class="screen">
+  <div id="list-head"><h1>차고 목록</h1><button id="btn-list-close" class="btn">닫기</button></div>
+  <div id="list-body"></div>
+</section>
+
+<!-- 완성 연출 -->
+<section id="screen-cere" class="screen">
+  <div><h1 id="cere-title"></h1><div id="cere-sub"></div></div>
+  <div id="cere-bottom">
+    <div id="spec-card"></div>
+    <button id="btn-cere-skip" class="btn ghost">건너뛰기</button>
+  </div>
+</section>
+
+<!-- 부모 모드: 비밀번호 -->
+<section id="screen-pin" class="screen">
+  <div id="pin-wrap">
+    <h2 id="pin-title">부모 비밀번호</h2>
+    <div id="pin-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div id="pin-msg"></div>
+    <div id="pin-pad"></div>
+    <button id="pin-cancel" class="btn ghost">돌아가기</button>
+  </div>
+</section>
+
+<!-- 부모 모드 -->
+<section id="screen-parent" class="screen">
+  <div id="parent-head"><h1>부모 모드</h1><button id="btn-parent-close" class="btn">닫기</button></div>
+  <div id="parent-tabs">
+    <button data-tab="plan" class="on">미션 등록</button>
+    <button data-tab="stats">달성률</button>
+    <button data-tab="settings">설정</button>
+    <button data-tab="data">데이터</button>
+  </div>
+
+  <div class="ptab on" id="ptab-plan">
+    <div class="pcard">
+      <div class="row-btns" style="align-items:center; justify-content:space-between">
+        <div class="seg" id="week-seg"><button data-w="0" class="on">이번 주</button><button data-w="1">다음 주</button></div>
+        <button id="btn-copy-prev" class="btn ghost">지난 주 복사</button>
+      </div>
+      <p class="hint" id="week-range"></p>
+    </div>
+    <div id="day-tabs"></div>
+    <div class="pcard">
+      <div id="plan-rows"></div>
+      <div class="row-btns"><button id="btn-add-mission" class="btn ghost">+ 미션 추가</button></div>
+      <p class="hint">등록하지 않은 평일은 기본 과목(하루 미션 수만큼)이 자동으로 들어갑니다. 주말은 등록한 것만.</p>
+    </div>
+  </div>
+
+  <div class="ptab" id="ptab-stats">
+    <div class="pcard"><h3>달성률</h3><div class="stat-grid" id="stat-grid"></div></div>
+    <div class="pcard"><h3>모듈별 균형 (최근 4주)</h3><div id="module-bars"></div>
+      <p class="hint">어느 과목이 밀리는지 봅니다. 회색 임시 부품 수도 함께 표시.</p></div>
+    <div class="pcard"><h3>최근 2주</h3><div id="recent-days"></div></div>
+  </div>
+
+  <div class="ptab" id="ptab-settings">
+    <div class="pcard"><h3>하루 미션 수 (기본 생성)</h3><div class="seg" id="set-perday"></div></div>
+    <div class="pcard"><h3>다음 단계 해금 기준 (주간 달성률)</h3><div class="seg" id="set-unlock"></div></div>
+    <div class="pcard"><h3>타이머 기본값</h3><div class="seg" id="set-minutes"></div></div>
+    <div class="pcard"><h3>3D 품질</h3><div class="seg" id="set-quality"></div>
+      <p class="hint">낮음: 픽셀비율 1.0, 안티앨리어싱 끔. 태블릿이 뜨거워지면 낮음으로.</p></div>
+    <div class="pcard"><h3>비밀번호</h3><div class="row-btns"><button id="btn-pin-change" class="btn ghost">비밀번호 바꾸기</button></div></div>
+  </div>
+
+  <div class="ptab" id="ptab-data">
+    <div class="pcard"><h3>내보내기 / 가져오기</h3>
+      <div class="row-btns">
+        <button id="btn-export" class="btn">JSON 내보내기</button>
+        <button id="btn-import" class="btn ghost">JSON 가져오기</button>
+        <input id="file-import" type="file" accept="application/json,.json">
+      </div>
+      <p class="hint">기기를 옮길 때: 이 기기에서 내보내기 → 파일을 새 기기로 옮김 → 새 기기에서 가져오기. 가져오면 현재 데이터를 덮어씁니다.</p>
+    </div>
+    <div class="pcard"><h3>테스트용</h3>
+      <div class="row-btns">
+        <button id="btn-test-unlock" class="btn ghost">이번 주 달성 처리 → 다음 단계</button>
+        <button id="btn-test-fill" class="btn ghost">현재 단계 부품 전부 결합</button>
+      </div>
+      <p class="hint">흐름 확인용. 4단계에서 "달성 처리"하면 완성 연출이 나옵니다.</p></div>
+    <div class="pcard"><h3>초기화</h3>
+      <div class="row-btns"><button id="btn-reset" class="btn ghost">모든 진행 지우기</button></div>
+      <p class="hint">전차·부품·미션 기록·설정이 모두 지워집니다.</p></div>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from './three.module.js';
+
+/* =====================================================================
+   1. 데이터: 모듈, 과목, 전차 목록, 부품 목록
+   ===================================================================== */
+const MODULES = {
+  gun:    { name: '주포·조준',   cls: 'm-gun' },
+  engine: { name: '엔진·변속기', cls: 'm-engine' },
+  radio:  { name: '무전기·통신', cls: 'm-radio' },
+  armor:  { name: '장갑·궤도',   cls: 'm-armor' },
+  misc:   { name: '승무원 장비', cls: 'm-misc' },
+};
+const SUBJECTS = {
+  '수학':     'gun',
+  '수학패드': 'engine',
+  '영어':     'radio',
+  '구몬':     'armor',
+  '기타':     'misc',
+};
+const TIERS = [
+  { id: 'basic',  name: '초급',      need: null },
+  { id: 'mid',    name: '중급',      need: 'basic' },   // 초급 1대 완성 시
+  { id: 'modern', name: '현대 전차', need: 'mid' },     // 중급 1대 완성 시
+];
+const TANKS = [
+  { id: 'pz4', tier: 'basic', name: '4호 전차', country: '독일', year: 1939, nick: '독일군의 일꾼', ready: true,
+    spec: { 주포: '7.5cm KwK 40 L/48', 중량: '25 t', 최고속도: '38 km/h', 승무원: '5명', 생산: '약 8,500대' } },
+  { id: 't34', tier: 'basic', name: 'T-34', country: '소련', year: 1940, nick: '경사 장갑의 원조', ready: false,
+    spec: { 주포: '76.2mm F-34', 중량: '26 t', 최고속도: '53 km/h', 승무원: '4명' } },
+  { id: 'm4', tier: 'basic', name: 'M4 셔먼', country: '미국', year: 1942, nick: '가장 많이 만든 전차', ready: false,
+    spec: { 주포: '75mm M3', 중량: '30 t', 최고속도: '38 km/h', 승무원: '5명' } },
+  { id: 'tiger', tier: 'mid', name: '티거 I', country: '독일', year: 1942, nick: '두꺼운 장갑과 88mm', ready: false },
+  { id: 'is2', tier: 'mid', name: 'IS-2', country: '소련', year: 1943, nick: '122mm 중전차', ready: false },
+  { id: 'm26', tier: 'mid', name: 'M26 퍼싱', country: '미국', year: 1944, nick: '90mm 신형', ready: false },
+  { id: 'leo2', tier: 'modern', name: '레오파르트 2', country: '독일', year: 1979, nick: '', ready: false },
+  { id: 't90', tier: 'modern', name: 'T-90', country: '러시아', year: 1992, nick: '', ready: false },
+  { id: 'k2', tier: 'modern', name: 'K2 흑표', country: '한국', year: 2014, nick: '', ready: false },
+  { id: 'm1', tier: 'modern', name: 'M1 에이브람스', country: '미국', year: 1980, nick: '', ready: false },
+];
+// 꾸미기 선택지
+const BASE_COLORS = [
+  { id: 'dunkelgelb', name: '독일 황색', hex: 0xb9a56a, country: '독일' },
+  { id: 'panzergrau', name: '독일 회색', hex: 0x5a5f66, country: '독일' },
+  { id: 'soviet',     name: '소련 녹색', hex: 0x5c7345, country: '소련' },
+  { id: 'olive',      name: '미국 올리브', hex: 0x6b6a4a, country: '미국' },
+];
+const CAMOS = [
+  { id: 'none', name: '단색' }, { id: 'tricolor', name: '삼색 위장' }, { id: 'winter', name: '겨울 백색' }, { id: 'digital', name: '디지털' },
+];
+const UNIT_MARKS = [
+  { id: 'none', name: '없음' }, { id: 'shield', name: '방패' }, { id: 'arrow', name: '화살' }, { id: 'bolt', name: '번개' },
+];
+// 4주차 마감 항목: 미션 1개 완료 = 꾸미기 항목 1개 해금
+const FINISH_STEPS = [
+  { id: 'paint', name: '기본 도색', module: 'armor' },
+  { id: 'camo', name: '위장 무늬', module: 'armor' },
+  { id: 'mark', name: '마킹 (국적·부대·번호)', module: 'misc' },
+  { id: 'inspect', name: '완성 검수', module: 'gun' },
+];
+
+// 4호 전차 부품 목록. 순서 = 붙는 순서. stage 1 하부 / 2 상부 / 3 무장·장비
+// build(ctx)는 부품의 Object3D를 만들어 돌려준다 (ctx.tank / ctx.turret 중 어디에 붙을지는 parent로 지정)
+const PZ4_PARTS = [
+  // ---- 1주 하부 ----
+  { id: 'hull-low',  name: '하부 차체',     stage: 1, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 5.7, 0.72, 1.98, 0.10, 0.80, 0) },
+  // 카메라가 우측을 보므로 우측 주행장치를 먼저 붙인다 (첫 부품이 바로 보이게)
+  ...[0,1,2,3].map(i => ({ id: `bogie-r${i}`, name: `보기륜 우 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.bogie(1, i) })),
+  ...[0,1,2,3].map(i => ({ id: `bogie-l${i}`, name: `보기륜 좌 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.bogie(-1, i) })),
+  { id: 'roller-r',  name: '리턴 롤러 우',  stage: 1, module: 'armor',  parent: 'tank',   build: c => c.rollers(1) },
+  { id: 'roller-l',  name: '리턴 롤러 좌',  stage: 1, module: 'armor',  parent: 'tank',   build: c => c.rollers(-1) },
+  { id: 'sprocket-r',name: '기동륜 우',     stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.35, c.TRACK_W, 16, 2.35, 0.52, c.TRACK_Z) },
+  { id: 'sprocket-l',name: '기동륜 좌',     stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.35, c.TRACK_W, 16, 2.35, 0.52, -c.TRACK_Z) },
+  { id: 'idler',     name: '유동륜 좌·우',  stage: 1, module: 'armor',  parent: 'tank',   build: c => c.group([-1, 1].map(s => c.wheel(c.M.track, 0.32, c.TRACK_W, 16, -2.45, 0.50, s * c.TRACK_Z))) },
+  { id: 'track-r',   name: '궤도 우',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.track(1) },
+  { id: 'track-l',   name: '궤도 좌',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.track(-1) },
+  // ---- 2주 상부 ----
+  { id: 'hull-up',   name: '상부 차체',     stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 5.3, 0.60, 2.88, -0.30, 1.46, 0) },
+  { id: 'driver-pl', name: '운전수 전면판', stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 0.10, 0.44, 2.4, 2.38, 1.54, 0) },
+  { id: 'hatch-drv', name: '운전수 해치',   stage: 2, module: 'misc',   parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.5, 0.06, 0.4, 2.42, 1.78, -0.7) },
+  { id: 'hatch-rad', name: '무전수 해치',   stage: 2, module: 'radio',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.5, 0.06, 0.4, 2.42, 1.78, 0.7) },
+  { id: 'deck-l',    name: '엔진 데크 좌',  stage: 2, module: 'engine', parent: 'tank',   build: c => c.box(c.M.yellowDark, 1.4, 0.04, 1.0, -2.1, 1.78, -0.75) },
+  { id: 'deck-r',    name: '엔진 데크 우',  stage: 2, module: 'engine', parent: 'tank',   build: c => c.box(c.M.yellowDark, 1.4, 0.04, 1.0, -2.1, 1.78, 0.75) },
+  { id: 'fender',    name: '앞 펜더',       stage: 2, module: 'armor',  parent: 'tank',   build: c => c.group([-1, 1].map(s => c.box(c.M.yellow, 0.7, 0.04, 0.48, 2.65, 1.14, s * 1.26))) },
+  { id: 'turret',    name: '포탑 본체',     stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 2.1, 0.72, 1.7, 0, 0.36, 0) },
+  { id: 'turret-sl', name: '포탑 경사판 좌',stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 1.7, 0.72, 0.5, -0.05, 0.36, -1.0, 0.16) },
+  { id: 'turret-sr', name: '포탑 경사판 우',stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 1.7, 0.72, 0.5, -0.05, 0.36, 1.0, -0.16) },
+  { id: 'stowage',   name: '포탑 수납함',   stage: 2, module: 'misc',   parent: 'turret', build: c => c.box(c.M.yellowDark, 0.55, 0.50, 1.6, -1.30, 0.34, 0) },
+  { id: 'hatch-side',name: '포탑 측면 해치',stage: 2, module: 'misc',   parent: 'turret', build: c => c.group([
+      c.box(c.M.yellowDark, 0.05, 0.42, 0.42, 0.2, 0.36, -1.24, 0.16), c.box(c.M.yellowDark, 0.05, 0.42, 0.42, 0.2, 0.36, 1.24, -0.16)]) },
+  { id: 'cupola',    name: '큐폴라',        stage: 2, module: 'gun',    parent: 'turret', build: c => c.cyl(c.M.yellow, 0.34, 0.30, 12, -0.55, 0.86, 0) },
+  { id: 'cupola-h',  name: '큐폴라 해치',   stage: 2, module: 'misc',   parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.30, 0.05, 12, -0.55, 1.03, 0) },
+  // ---- 3주 무장·장비 ----
+  { id: 'mantlet',   name: '포방패',        stage: 3, module: 'gun',    parent: 'turret', build: c => c.box(c.M.yellowDark, 0.40, 0.62, 1.05, 1.15, 0.36, 0) },
+  { id: 'gun',       name: '주포 (7.5cm)',  stage: 3, module: 'gun',    parent: 'turret', build: c => c.tube(c.M.yellowDark, 0.075, 2.7, 10, 2.7, 0.40, 0) },
+  { id: 'muzzle',    name: '머즐 브레이크', stage: 3, module: 'gun',    parent: 'turret', build: c => c.group([
+      c.tube(c.M.gunDark, 0.10, 0.34, 10, 3.90, 0.40, 0, false), c.tube(c.M.gunDark, 0.075, 0.06, 10, 4.10, 0.40, 0, false)]) },
+  { id: 'mg',        name: '차체 기관총',   stage: 3, module: 'gun',    parent: 'tank',   build: c => c.tube(c.M.gunDark, 0.05, 0.35, 8, 2.55, 1.55, 0.75) },
+  { id: 'antenna',   name: '안테나',        stage: 3, module: 'radio',  parent: 'tank',   build: c => c.cyl(c.M.steel, 0.015, 1.6, 5, -2.0, 2.55, 1.35) },
+  { id: 'muffler',   name: '배기 머플러',   stage: 3, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.steel, 0.16, 1.7, 10, -3.05, 1.05, 0) },
+  { id: 'lamp',      name: '전조등',        stage: 3, module: 'misc',   parent: 'tank',   build: c => c.tube(c.M.steel, 0.09, 0.14, 8, 2.85, 1.26, -1.1, false) },
+  { id: 'toolbox',   name: '공구함',        stage: 3, module: 'misc',   parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.9, 0.28, 0.3, 0.9, 1.90, -1.25) },
+  { id: 'spare',     name: '예비 궤도',     stage: 3, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.track, 0.7, 0.08, 0.36, 1.3, 1.80, 1.15) },
+  { id: 'tskirt-l',  name: '포탑 쉬르첸 좌',stage: 3, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 2.2, 0.60, 0.04, -0.60, 0.36, -1.40, 0.08) },
+  { id: 'tskirt-r',  name: '포탑 쉬르첸 우',stage: 3, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 2.2, 0.60, 0.04, -0.60, 0.36, 1.40, -0.08) },
+  { id: 'tskirt-b',  name: '포탑 쉬르첸 뒤',stage: 3, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 0.04, 0.60, 2.6, -1.72, 0.36, 0) },
+  { id: 'hskirt-l',  name: '차체 쉬르첸 좌',stage: 3, module: 'armor',  parent: 'tank',   build: c => c.group([
+      c.box(c.M.yellow, 5.0, 1.0, 0.05, -0.25, 0.70, -1.52), c.box(c.M.yellowDark, 5.0, 0.06, 0.16, -0.25, 1.15, -1.46)]) },
+  { id: 'hskirt-r',  name: '차체 쉬르첸 우',stage: 3, module: 'armor',  parent: 'tank',   build: c => c.group([
+      c.box(c.M.yellow, 5.0, 1.0, 0.05, -0.25, 0.70, 1.52), c.box(c.M.yellowDark, 5.0, 0.06, 0.16, -0.25, 1.15, 1.46)]) },
+];
+const STAGE_NAMES = { 1: '하부', 2: '상부', 3: '무장·장비', 4: '마감' };
+const defaultDecor = () => ({ base: 'dunkelgelb', camo: 'none', national: false, unit: 'none', number: '' });
+const DURATIONS = [20, 30, 40, 50];   // 미션 시간 선택지(분)
+// 주간 목표·해금 기준은 settings(부모 모드)에서. 해금 자체는 4단계
+
+/* =====================================================================
+   2. 저장 (localStorage 키 tankPlanner)
+   ===================================================================== */
+const KEY = 'tankPlanner';
+const todayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function weekKey(d = new Date()) {   // 그 주 월요일 날짜
+  const m = new Date(d); const day = (m.getDay() + 6) % 7; m.setDate(m.getDate() - day); return todayKey(m);
+}
+const defaultSettings = () => ({ missionsPerDay: 3, unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', pin: null });
+const defaultState = () => ({
+  version: 3, tank: null,
+  build: { stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' },   // status: building | ceremony
+  decor: defaultDecor(),
+  garage: [],                            // 완성한 전차 [{ tank, month, decor, thumb, completedAt }]
+  attached: [],                          // [{ id, ok }]  ok=false면 회색 임시 부품
+  missions: { date: null, items: [] },   // 오늘 미션
+  history: {},                           // { 'YYYY-MM-DD': [ {subject, title, minutes, status} ] } 지난 날들
+  plan: {},                              // { 'YYYY-MM-DD'(월요일): { 0..6: [ {subject, title, minutes} ] } } 부모가 등록한 주간 미션
+  settings: defaultSettings(),
+});
+let state = load();
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.version >= 1 && s.version <= 3) return migrate(s);
+  } catch {}
+  return defaultState();
+}
+function migrate(s) {
+  if (s.version === 1) { s.version = 2; s.history = {}; s.plan = {}; delete s.week; }
+  if (s.version === 2) {
+    s.version = 3; s.decor = defaultDecor(); s.garage = [];
+    const maxStage = Math.max(1, ...(s.attached || []).map(a => (PZ4_PARTS.find(p => p.id === a.id) || {}).stage || 1));
+    s.build = { stage: maxStage, startWeek: weekKey(), evaluated: [], finish: [], status: 'building' };
+  }
+  s.build = Object.assign({ stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' }, s.build || {});
+  s.decor = Object.assign(defaultDecor(), s.decor || {}); s.garage = s.garage || [];
+  s.settings = Object.assign(defaultSettings(), s.settings || {});
+  s.history = s.history || {}; s.plan = s.plan || {};
+  return s;
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn('저장 실패', e); } }
+
+// 오늘 미션이 없으면 기본 미션 생성 (부모 모드는 3단계 — 지금은 요일별 기본 과목)
+const DEFAULT_ROTATION = [
+  ['수학', '영어', '구몬'], ['수학패드', '수학', '영어'], ['구몬', '수학패드', '수학'],
+  ['영어', '구몬', '수학패드'], ['수학', '영어', '구몬'], ['수학패드', '구몬', '영어'], ['영어', '수학', '구몬'],
+];
+const dow = d => (d.getDay() + 6) % 7;                 // 0=월 … 6=일
+const DOW_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
+function addDays(key, n) { const d = new Date(key + 'T00:00:00'); d.setDate(d.getDate() + n); return todayKey(d); }
+// 어떤 날의 미션 명세: 부모가 등록했으면 그것, 아니면 평일만 기본 과목
+function specFor(dateKey) {
+  const d = new Date(dateKey + 'T00:00:00'), wk = weekKey(d), i = dow(d);
+  const planned = state.plan[wk] && state.plan[wk][i];
+  if (planned) return planned.map(x => ({ ...x }));
+  if (i >= 5) return [];
+  return DEFAULT_ROTATION[i].slice(0, state.settings.missionsPerDay).map(s => ({ subject: s, title: `${s} 숙제`, minutes: state.settings.defaultMinutes }));
+}
+function ensureToday() {
+  const t = todayKey();
+  if (state.missions.date !== t) {
+    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, title, minutes, status }) => ({ subject, title, minutes, status }));
+    state.missions = { date: t, items: [] };
+    rebuildToday();
+  }
+  save();
+}
+// 오늘 미션을 명세에서 다시 만든다. 이미 시작·완료한 항목은 같은 자리에 같은 과목이면 유지
+function rebuildToday() {
+  const t = state.missions.date, old = state.missions.items;
+  state.missions.items = specFor(t).map((sp, i) => {
+    const o = old[i];
+    if (o && o.status !== 'todo' && o.subject === sp.subject) return o;
+    return { id: `${t}-${i}`, subject: sp.subject, title: sp.title || `${sp.subject} 숙제`, minutes: sp.minutes || state.settings.defaultMinutes, status: 'todo' };
+  });
+}
+// 통계용: 날짜별 항목 (지난 날 + 오늘)
+function itemsOn(dateKey) { return dateKey === state.missions.date ? state.missions.items : (state.history[dateKey] || []); }
+function weekStats(wk = weekKey()) {
+  let planned = 0, done = 0;
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(wk, i); const items = itemsOn(k);
+    if (k <= todayKey()) { planned += items.length; done += items.filter(m => m.status === 'done').length; }
+    else planned += specFor(k).length;           // 아직 안 온 날은 명세로 셈
+  }
+  return { planned, done };
+}
+
+/* =====================================================================
+   3. 3D 장면 (0단계 설정 그대로: 조명 2개, 그림자 이미지, 픽셀비율 1.5, 30fps)
+   ===================================================================== */
+const TARGET_FPS = 30, MAX_PIXEL_RATIO = 1.5;
+let canvas = document.getElementById('c');
+let renderer = makeRenderer();
+function makeRenderer() {
+  const high = state.settings.quality === 'high';
+  const r = new THREE.WebGLRenderer({ canvas, antialias: high, powerPreference: 'low-power' });
+  r.setPixelRatio(high ? Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO) : 1);
+  r.shadowMap.enabled = false;
+  return r;
+}
+// 품질 변경: 안티앨리어싱은 컨텍스트 생성 옵션이라 캔버스를 새로 만들어 교체
+function applyQuality() {
+  renderer.dispose();
+  const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = fresh;
+  renderer = makeRenderer(); bindCanvas(canvas); resize();
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x6f6a62);
+scene.fog = new THREE.Fog(0x6f6a62, 18, 40);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
+const CAM_DIR = new THREE.Vector3(7.5, 4.2, 9.5).normalize();
+const CAM_TARGET = new THREE.Vector3(0, 1.1, 0);
+scene.add(new THREE.HemisphereLight(0xdde6f0, 0x5a5348, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(5, 8, 4); scene.add(sun);
+
+const M = {
+  yellow: new THREE.MeshLambertMaterial({ color: 0xb9a56a }),
+  yellowDark: new THREE.MeshLambertMaterial({ color: 0x9f8c57 }),
+  track: new THREE.MeshLambertMaterial({ color: 0x3b3b3b }),
+  rubber: new THREE.MeshLambertMaterial({ color: 0x2a2a2a }),
+  steel: new THREE.MeshLambertMaterial({ color: 0x555555 }),
+  gunDark: new THREE.MeshLambertMaterial({ color: 0x4a4a48 }),
+  grey: new THREE.MeshLambertMaterial({ color: 0x9a9a9a }),     // 회색 임시 부품
+  floor: new THREE.MeshLambertMaterial({ color: 0x8b857b }),
+};
+
+// 바닥 + 그림자 이미지
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), M.floor); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const tank = new THREE.Group(); scene.add(tank);
+const turret = new THREE.Group(); turret.position.set(0.20, 1.76, 0); tank.add(turret);
+{
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 10, 64, 64, 64);
+  g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(0.7, 'rgba(0,0,0,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 4.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.005; tank.add(shadow);
+}
+
+// ---- 지오메트리 헬퍼 (부품 build 함수에 ctx로 넘김) ----
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+const geoCache = new Map();
+function cached(key, make) { if (!geoCache.has(key)) geoCache.set(key, make()); return geoCache.get(key); }
+const ctx = {
+  M, TRACK_Z: 1.24, TRACK_W: 0.40,
+  box(mat, w, h, d, x, y, z, rotY = 0, rotZ = 0) {
+    const m = new THREE.Mesh(boxGeo, mat); m.scale.set(w, h, d); m.position.set(x, y, z); m.rotation.set(0, rotY, rotZ); return m;
+  },
+  wheel(mat, r, w, seg, x, y, z) {          // 축이 Z(좌우)
+    const g = cached(`w${r}|${w}|${seg}`, () => new THREE.CylinderGeometry(r, r, w, seg).rotateX(Math.PI / 2));
+    const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m;
+  },
+  tube(mat, r, len, seg, x, y, z, open = true) {   // 축이 X(앞뒤)
+    const g = cached(`t${r}|${len}|${seg}|${open}`, () => new THREE.CylinderGeometry(r, r, len, seg, 1, open).rotateZ(-Math.PI / 2));
+    const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m;
+  },
+  cyl(mat, r, h, seg, x, y, z) {            // 축이 Y(위)
+    const g = cached(`c${r}|${h}|${seg}`, () => new THREE.CylinderGeometry(r, r, h, seg));
+    const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m;
+  },
+  group(children) { const g = new THREE.Group(); children.forEach(c => g.add(c)); return g; },
+  bogie(side, i) {                           // 보기륜 2개 + 허브 2개 (한 보기 단위)
+    const z = side * this.TRACK_Z, y = 0.08 + 0.235;
+    const xs = [1.85 - (i * 2) * (3.7 / 7), 1.85 - (i * 2 + 1) * (3.7 / 7)];
+    return this.group(xs.flatMap(x => [this.wheel(M.rubber, 0.235, 0.34, 14, x, y, z), this.wheel(M.yellow, 0.15, 0.36, 10, x, y, z)]));
+  },
+  rollers(side) {
+    const z = side * this.TRACK_Z;
+    return this.group([1.55, 0.55, -0.45, -1.45].map(x => this.wheel(M.rubber, 0.13, 0.3, 10, x, 0.70, z)));
+  },
+  track(side) {                              // 이어진 띠 4조각 (개별 링크 없음)
+    const z = side * this.TRACK_Z, W = this.TRACK_W;
+    return this.group([
+      this.box(M.track, 4.2, 0.09, W, 0.0, 0.045, z), this.box(M.track, 4.8, 0.08, W, -0.05, 0.85, z),
+      this.box(M.track, 0.48, 0.08, W, 2.31, 0.13, z, 0, 0.38), this.box(M.track, 0.54, 0.08, W, -2.36, 0.13, z, 0, -0.34),
+    ]);
+  },
+};
+
+// ---- 부품 객체 생성: 전부 만들어 두고 숨김. 붙을 때 보이게 + 결합 연출 ----
+const partObjects = new Map();   // id -> { obj, part, target(Vector3) }
+const anims = [];
+function buildTank(parts) {
+  for (const v of partObjects.values()) v.obj.parent.remove(v.obj);
+  partObjects.clear();
+  for (const p of parts) {
+    const obj = p.build(ctx);
+    const parent = p.parent === 'turret' ? turret : tank;
+    obj.visible = false;
+    obj.traverse(o => { if (o.isMesh) o.userData.mat = o.material; });
+    parent.add(obj);
+    partObjects.set(p.id, { obj, part: p, target: obj.position.clone() });
+  }
+}
+function setPartColor(id, ok) {
+  const v = partObjects.get(id); if (!v) return;
+  v.obj.traverse(o => { if (o.isMesh) o.material = ok ? o.userData.mat : M.grey; });
+}
+function showPart(id, ok, animate, onLand) {
+  const v = partObjects.get(id); if (!v) return;
+  setPartColor(id, ok);
+  v.obj.visible = true;
+  if (!animate) { v.obj.position.copy(v.target); return; }
+  // 위·바깥에서 제자리로 날아와 결합. 도착 순간 onLand 호출 (효과음·번쩍임)
+  const from = v.target.clone().add(new THREE.Vector3(0, 3.5, 0)).add(new THREE.Vector3(v.target.x, 0, v.target.z).normalize().multiplyScalar(1.5));
+  anims.push({ obj: v.obj, from, to: v.target, base: v.obj.scale.clone(), t: 0, dur: 0.55, onLand });
+}
+function stepAnims(dt) {
+  for (let i = anims.length - 1; i >= 0; i--) {
+    const a = anims[i]; a.t += dt; const k = Math.min(1, a.t / a.dur);
+    const e = 1 - Math.pow(1 - k, 3);                                   // ease-out cubic
+    a.obj.position.lerpVectors(a.from, a.to, e);
+    a.obj.scale.copy(a.base).multiplyScalar(1 + 0.25 * (1 - e));
+    if (k >= 1) { a.obj.position.copy(a.to); a.obj.scale.copy(a.base); anims.splice(i, 1); a.onLand && a.onLand(); }
+  }
+}
+// 저장된 조립 상태를 화면에 반영 (연출 없이)
+function applyAttached() {
+  for (const v of partObjects.values()) v.obj.visible = false;
+  for (const a of state.attached) showPart(a.id, a.ok, false);
+}
+
+// ---- 입력: 캔버스 위 드래그로 Y축 회전만 ----
+let dragging = false, lastX = 0, velocity = 0;
+function bindCanvas(c) {
+  c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; velocity = 0; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e => { if (!dragging) return; const dx = e.clientX - lastX; lastX = e.clientX; velocity = dx * 0.008; tank.rotation.y += velocity; });
+  c.addEventListener('pointerup', () => dragging = false);
+  c.addEventListener('pointercancel', () => dragging = false);
+}
+bindCanvas(canvas);
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---- 리사이즈: 가로면 전차를 왼쪽, 세로면 위쪽에 두기 위해 뷰 오프셋 사용 ----
+let layoutCenter = false;
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const portrait = h > w;
+  const dist = portrait ? 21 : 12.5;   // 세로는 화면이 좁아 더 물러남
+  camera.position.copy(CAM_DIR).multiplyScalar(dist).add(CAM_TARGET);
+  camera.lookAt(CAM_TARGET);
+  // 가로: 화면 오른쪽 380px이 패널 → 그 절반만큼 왼쪽으로. 세로: 아래 56%가 패널 → 위로. 완성 연출은 가운데
+  if (layoutCenter) camera.setViewOffset(w, h, 0, portrait ? -h * 0.05 : 0, w, h);
+  else if (portrait) camera.setViewOffset(w, h, 0, h * 0.26, w, h);
+  else camera.setViewOffset(w, h, 190, 0, w, h);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ---- 주간 해금: 지난 주(또는 주말에 이른 이번 주) 달성률 ≥ 기준이면 다음 단계 ----
+function weekPassed(wk) {
+  const ws = weekStats(wk);
+  return ws.planned === 0 || ws.done / ws.planned >= state.settings.unlockRatio;
+}
+function evaluateUnlocks() {
+  const b = state.build; if (!b.startWeek) b.startWeek = weekKey();
+  if (b.status !== 'building') return;
+  const today = todayKey(), cur = weekKey(), weekend = dow(new Date()) >= 5;
+  for (let wk = b.startWeek; wk <= cur; wk = addDays(wk, 7)) {
+    if (b.evaluated.includes(wk)) continue;
+    if (wk === cur && !weekend) break;                      // 이번 주는 토요일부터 판정
+    b.evaluated.push(wk);
+    if (weekPassed(wk)) advanceStage();
+    if (b.status !== 'building') break;
+  }
+  save();
+}
+function advanceStage() {
+  const b = state.build;
+  if (b.stage < 4) { b.stage++; b.pendingToast = `${b.stage}주차 해금! ${STAGE_NAMES[b.stage]} 단계`; }
+  else b.status = 'ceremony';                                // 4주차 통과 → 완성
+}
+const stageParts = st => parts().filter(p => p.stage === st);
+const stageDone = st => stageParts(st).every(p => state.attached.some(a => a.id === p.id));
+
+// ---- 렌더 루프 (30fps 상한, 숨김·선택 화면에서는 저부하) ----
+const hud = document.getElementById('hud');
+const frameInterval = 1000 / TARGET_FPS;
+let last = 0, prev = 0, frames = 0, fpsTime = 0;
+let renderOn = true;              // 집중 모드에서는 false → 렌더링 완전 정지
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (document.hidden || !renderOn) return;
+  if (now - last < frameInterval - 1) return;
+  const dt = Math.min(0.1, (now - prev) / 1000); prev = now; last = now;
+  if (!dragging && Math.abs(velocity) > 0.0005) { tank.rotation.y += velocity; velocity *= 0.92; }
+  stepAnims(dt); stepCeremony(dt);
+  renderer.render(scene, camera);
+  frames++;
+  if (now - fpsTime >= 1000) {
+    const i = renderer.info.render;
+    hud.textContent = `tris ${i.triangles} calls ${i.calls} fps ${frames} pr ${renderer.getPixelRatio().toFixed(2)}`;
+    frames = 0; fpsTime = now;
+  }
+}
+
+/* =====================================================================
+   3b. 효과음(Web Audio, 외부 파일 없음) · 진동 · 화면 꺼짐 방지
+   ===================================================================== */
+const sfx = (() => {
+  let ac = null, unlocked = false;
+  // 브라우저 정책: 첫 사용자 터치 이후에만 소리를 낼 수 있음
+  function unlock() {
+    if (unlocked) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      ac.resume().then(() => { unlocked = ac.state === 'running'; });
+      unlocked = ac.state === 'running';
+    } catch { ac = null; }
+  }
+  ['pointerdown', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, unlock, { passive: true }));
+  const ready = () => !!ac && ac.state === 'running';
+  function tone(freq, dur, type = 'sine', gain = 0.25, t0 = 0, slideTo = null) {
+    const t = ac.currentTime + t0, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, gain = 0.3, t0 = 0, hp = 800) {
+    const t = ac.currentTime + t0, n = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const g = ac.createGain(); g.gain.value = gain;
+    src.connect(f).connect(g).connect(ac.destination); src.start(t);
+  }
+  const vibrate = pat => { try { navigator.vibrate && navigator.vibrate(pat); } catch {} };
+  return {
+    ready,
+    whoosh() { if (ready()) tone(220, 0.45, 'sawtooth', 0.05, 0, 900); },
+    clank(ok = true) {                                   // 부품 결합: 금속 충돌 + 울림
+      vibrate(ok ? [40, 30, 60] : 50);
+      if (!ready()) return;
+      noise(0.08, 0.35, 0, 1500);
+      tone(ok ? 180 : 120, 0.25, 'square', 0.18);
+      if (ok) { tone(880, 0.35, 'sine', 0.12, 0.05); tone(1320, 0.5, 'sine', 0.08, 0.08); }
+      else tone(300, 0.3, 'triangle', 0.08, 0.05, 200);
+    },
+    chime() {                                            // 타이머 종료
+      vibrate([120, 80, 120, 80, 200]);
+      if (!ready()) return;
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.5, 'sine', 0.15, i * 0.13));
+    },
+    tick() { if (ready()) tone(1200, 0.04, 'sine', 0.05); },
+  };
+})();
+
+const wake = (() => {                                    // 타이머 도는 동안 화면 꺼짐 방지
+  let lock = null, want = false;
+  async function request() {
+    if (!('wakeLock' in navigator) || lock) return;
+    try { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); }
+    catch (e) { console.warn('wakeLock 실패', e); }
+  }
+  document.addEventListener('visibilitychange', () => { if (want && document.visibilityState === 'visible') request(); });
+  return {
+    on() { want = true; request(); },
+    off() { want = false; if (lock) { lock.release().catch(() => {}); lock = null; } },
+    supported: 'wakeLock' in navigator,
+  };
+})();
+
+/* =====================================================================
+   4. 화면: 전차 선택
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const screens = { select: $('#screen-select'), garage: $('#screen-garage'), focus: $('#screen-focus'), pin: $('#screen-pin'), parent: $('#screen-parent'),
+  decor: $('#screen-decor'), list: $('#screen-list'), cere: $('#screen-cere') };
+function show(name) {
+  for (const k in screens) screens[k].classList.toggle('on', k === name);
+  const threeD = ['garage', 'select', 'decor', 'cere'].includes(name);   // 그 외 화면에서는 렌더링 정지
+  layoutCenter = name === 'cere';
+  if (threeD && !renderOn) { canvas.style.display = ''; renderOn = true; prev = performance.now(); resize(); }
+  if (!threeD && renderOn) { renderOn = false; canvas.style.display = 'none'; hud.textContent = '3D 정지'; }
+}
+
+// 카드 썸네일: 단순 옆모습 SVG (전차별로 실루엣만 다르게)
+const THUMBS = {
+  pz4: `<svg viewBox="0 0 100 50"><rect x="10" y="30" width="80" height="12" rx="6" fill="#333"/><rect x="8" y="20" width="84" height="12" fill="#9f8c57"/><rect x="34" y="10" width="30" height="11" fill="#b9a56a"/><rect x="52" y="6" width="8" height="5" fill="#9f8c57"/><rect x="62" y="13" width="34" height="3" fill="#4a4a48"/>${[20,32,44,56,68,80].map(x=>`<circle cx="${x}" cy="36" r="3.5" fill="#b9a56a"/>`).join('')}</svg>`,
+  t34: `<svg viewBox="0 0 100 50"><rect x="8" y="30" width="84" height="12" rx="6" fill="#333"/><polygon points="6,32 14,18 90,18 96,32" fill="#4f6b3a"/><ellipse cx="50" cy="16" rx="18" ry="8" fill="#5d7c46"/><rect x="62" y="13" width="34" height="3" fill="#4a4a48"/>${[18,32,46,60,74].map(x=>`<circle cx="${x}" cy="36" r="5" fill="#5d7c46"/>`).join('')}</svg>`,
+  generic: `<svg viewBox="0 0 100 50"><rect x="10" y="30" width="80" height="12" rx="6" fill="#333"/><polygon points="6,32 16,18 90,18 96,32" fill="#666"/><rect x="36" y="9" width="30" height="11" rx="3" fill="#777"/><rect x="64" y="12" width="32" height="3" fill="#444"/></svg>`,
+  m4:  `<svg viewBox="0 0 100 50"><rect x="10" y="32" width="80" height="11" rx="5" fill="#333"/><rect x="10" y="16" width="80" height="17" rx="2" fill="#6b6a4a"/><ellipse cx="50" cy="14" rx="15" ry="8" fill="#7a7955"/><rect x="60" y="12" width="32" height="3" fill="#4a4a48"/>${[22,30,42,50,62,70].map(x=>`<circle cx="${x}" cy="37" r="3.5" fill="#7a7955"/>`).join('')}</svg>`,
+};
+let pendingTank = null;
+const completedInTier = tier => state.garage.filter(g => (TANKS.find(t => t.id === g.tank) || {}).tier === tier).length;
+const tierUnlocked = tier => { const t = TIERS.find(x => x.id === tier); return !t.need || completedInTier(t.need) > 0; };
+function renderSelect() {
+  const list = $('#tank-list'); list.innerHTML = '';
+  for (const t of TANKS) {
+    const unlocked = tierUnlocked(t.tier), tierName = TIERS.find(x => x.id === t.tier).name;
+    if (!unlocked && t.tier === 'modern' && !tierUnlocked('mid')) continue;   // 두 단계 위는 아직 안 보여줌
+    const card = document.createElement('button');
+    card.className = 'tank-card' + (t.ready && unlocked ? '' : ' locked') + (pendingTank === t.id ? ' selected' : '');
+    card.innerHTML = `<div class="thumb">${THUMBS[t.id] || THUMBS.generic}</div><h2>${t.name}</h2>
+      <div class="desc">${tierName} · ${t.country} · ${t.year}년${t.nick ? ' · ' + t.nick : ''}</div>
+      <div class="note">${!unlocked ? '🔒 ' + TIERS.find(x => x.id === t.tier).need.replace('basic', '초급').replace('mid', '중급') + ' 1대 완성 시 해금' : t.ready ? '' : '모델 준비 중'}</div>`;
+    card.disabled = !(t.ready && unlocked);
+    card.addEventListener('click', () => { pendingTank = t.id; renderSelect(); });
+    list.appendChild(card);
+  }
+  $('#btn-select').disabled = !pendingTank;
+}
+$('#btn-select').addEventListener('click', () => {
+  if (!pendingTank) return;
+  if (state.tank !== pendingTank) {
+    state.tank = pendingTank; state.attached = []; state.decor = defaultDecor();
+    state.build = { stage: 1, startWeek: weekKey(), evaluated: [], finish: [], status: 'building' };
+  }
+  save(); enterGarage();
+});
+
+/* =====================================================================
+   5. 화면: 차고(홈)
+   ===================================================================== */
+const parts = () => PZ4_PARTS;   // 1단계는 4호 전차만 실제 모델
+function enterGarage() {
+  ensureToday(); evaluateUnlocks();
+  buildTank(parts()); applyAttached(); applyDecor(state.decor);
+  const t = TANKS.find(x => x.id === state.tank);
+  $('#tank-name').textContent = t.name;
+  $('#tank-sub').textContent = `${t.country} · ${t.year}`;
+  renderGarage(); show('garage');
+  if (state.build.status === 'ceremony') { startCeremony(); return; }
+  if (state.build.pendingToast) { const m = state.build.pendingToast; delete state.build.pendingToast; save(); setTimeout(() => { toast(m); sfx.chime(); }, 400); }
+}
+function renderGarage() {
+  $('#today-str').textContent = state.missions.date.slice(5).replace('-', '/');
+  const box = $('#missions'); box.innerHTML = '';
+  for (const m of state.missions.items) {
+    const mod = MODULES[SUBJECTS[m.subject]];
+    const el = document.createElement('div');
+    el.className = 'mission ' + m.status;
+    const label = m.status === 'todo' ? '시작' : m.status === 'doing' ? '이어서' : '완료됨';
+    el.innerHTML = `<div class="title">${m.title}</div>
+      <div class="meta"><span class="badge ${mod.cls}">${mod.name}</span><span>${m.minutes}분</span></div>
+      <button class="btn act" ${m.status === 'done' ? 'disabled' : ''}>${label}</button>`;
+    el.querySelector('.act').addEventListener('click', () => onMission(m));
+    box.appendChild(el);
+  }
+  if (!state.missions.items.length) box.innerHTML = '<div class="mission"><div class="title">오늘은 미션이 없어요</div><div class="meta">푹 쉬는 날</div></div>';
+  const ws = weekStats();
+  const need = Math.ceil(ws.planned * state.settings.unlockRatio);
+  const left = Math.max(0, need - ws.done);
+  $('#progress-text').textContent = left > 0 ? `${ws.done}/${ws.planned} · 다음 단계까지 ${left}개` : `${ws.done}/${ws.planned} · 이번 주 달성!`;
+  $('#bar i').style.width = (ws.planned ? Math.min(100, ws.done / ws.planned * 100) : 0) + '%';
+  const all = parts(), n = state.attached.length, grey = state.attached.filter(a => !a.ok).length, b = state.build;
+  $('#stage-chip').textContent = `${b.stage}주차 · ${STAGE_NAMES[b.stage]}`;
+  const next = nextPart();
+  let txt;
+  if (b.stage < 4) txt = next ? `부품 ${n}/${all.length} · 다음: ${next.name}` : `${STAGE_NAMES[b.stage]} 완료 · 주말에 다음 단계가 열려요`;
+  else { const f = FINISH_STEPS[b.finish.length]; txt = f ? `마감 ${b.finish.length}/${FINISH_STEPS.length} · 다음: ${f.name}` : '마감 완료 · 주말에 완성!'; }
+  $('#parts-count').textContent = txt + (grey ? ` · 회색 ${grey}개` : '');
+  $('#btn-decor').disabled = !state.build.finish.length && !state.garage.length;
+}
+// 현재 단계에서 붙일 수 있는 다음 부품 (단계 잠금)
+function nextPart() {
+  return parts().find(p => p.stage <= state.build.stage && !state.attached.some(a => a.id === p.id)) || null;
+}
+function onMission(m) {
+  if (m.status === 'done') return;
+  enterFocus(m);   // todo면 시간 선택 후 "시작", doing이면 바로 타이머
+}
+function completeMission(m) {
+  m.status = 'done'; m.doneAt = Date.now(); save();
+  renderGarage();
+  setTimeout(() => { attachNext(SUBJECTS[m.subject]); save(); renderGarage(); }, 350);   // 차고가 보인 뒤 결합
+}
+// 결합 규칙: 다음 부품이 붙는다. 모듈이 맞으면 제색, 아니면 회색.
+// 회색으로 붙는 경우, 같은 모듈의 기존 회색 부품이 있으면 하나를 제색으로 교체.
+function attachNext(module) {
+  const all = parts(); const b = state.build;
+  if (b.stage === 4) {                                       // 마감 주: 꾸미기 항목 해금
+    const f = FINISH_STEPS[b.finish.length];
+    if (!f) { toast('마감까지 끝! 주말에 완성 검수'); return; }
+    b.finish.push(f.id); sfx.clank(true);
+    toast(f.id === 'inspect' ? '완성 검수 통과! 주말에 완성 연출' : `${f.name} 해금! "꾸미기"에서 골라요`);
+    return;
+  }
+  const next = nextPart();
+  if (!next) {
+    const g = state.attached.find(a => !a.ok && all.find(p => p.id === a.id).module === module);
+    if (g) { g.ok = true; setPartColor(g.id, true); sfx.clank(true); toast(`${all.find(p => p.id === g.id).name} 임시 부품 교체 완료`); }
+    else toast(`${STAGE_NAMES[b.stage]} 부품은 다 붙었어요. 이번 주 ${Math.round(state.settings.unlockRatio*100)}% 달성하면 주말에 다음 단계!`);
+    return;
+  }
+  const ok = next.module === module;
+  state.attached.push({ id: next.id, ok });
+  sfx.whoosh();
+  showPart(next.id, ok, true, () => {
+    sfx.clank(ok);
+    const st = $('#stage-area'); st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash');
+  });
+  let fixed = null;
+  if (!ok) {
+    const g = state.attached.find(a => !a.ok && all.find(p => p.id === a.id).module === module);
+    if (g) { g.ok = true; setPartColor(g.id, true); fixed = all.find(p => p.id === g.id).name; }
+  }
+  const modName = MODULES[next.module].name;
+  toast(ok ? `${next.name} 결합! (${modName})` : `${next.name} — 임시 부품 (${modName} 과목이 필요해요)` + (fixed ? ` · ${fixed} 교체 완료` : ''), !ok);
+}
+let toastTimer;
+function toast(msg, grey = false) {
+  const el = $('#toast'); el.textContent = msg; el.classList.toggle('grey', grey); el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+$('#btn-change').addEventListener('click', () => { pendingTank = state.tank; renderSelect(); show('select'); });
+$('#btn-decor').addEventListener('click', () => enterDecor('build'));
+$('#btn-list').addEventListener('click', () => enterList());
+$('#btn-parent').addEventListener('click', () => openPin(() => enterParent()));
+
+/* =====================================================================
+   5b. 집중 모드 — 3D 정지, 큰 타이머, 화면 꺼짐 방지
+   ===================================================================== */
+let focusMission = null, focusTimer = null;
+function enterFocus(m) {
+  focusMission = m;
+  const mod = MODULES[SUBJECTS[m.subject]];
+  $('#focus-badge').className = 'badge ' + mod.cls; $('#focus-badge').textContent = mod.name;
+  $('#focus-title').textContent = m.title;
+  const ready = m.status === 'todo';
+  screens.focus.classList.toggle('ready', ready);
+  if (ready) renderDurations(m);
+  // 마지막 프레임을 작은 이미지로 남기고 3D를 완전히 멈춘다
+  renderer.render(scene, camera);
+  try { $('#focus-snap').src = canvas.toDataURL('image/jpeg', 0.6); } catch { $('#focus-snap').removeAttribute('src'); }
+  renderOn = false; canvas.style.display = 'none'; hud.textContent = '3D 정지';
+  wake.on();
+  show('focus');
+  tickFocus();
+  clearInterval(focusTimer); focusTimer = setInterval(tickFocus, 500);
+}
+function leaveFocus() {
+  clearInterval(focusTimer); focusTimer = null; focusMission = null;
+  wake.off();
+  canvas.style.display = ''; renderOn = true; prev = performance.now(); resize();
+  show('garage');
+}
+function renderDurations(m) {
+  const box = $('#focus-durations'); box.innerHTML = '';
+  for (const d of DURATIONS) {
+    const b = document.createElement('button');
+    b.textContent = `${d}분`; b.classList.toggle('on', m.minutes === d);
+    b.addEventListener('click', () => { m.minutes = d; save(); renderDurations(m); tickFocus(); });
+    box.appendChild(b);
+  }
+}
+function tickFocus() {
+  const m = focusMission; if (!m) return;
+  if (m.status === 'todo') {   // 아직 시작 전: 선택한 시간만 표시
+    $('#focus-timer').textContent = String(m.minutes).padStart(2, '0') + ':00';
+    $('#focus-timer').classList.remove('over');
+    $('#focus-hint').textContent = '시간을 고르고 시작을 눌러요';
+    return;
+  }
+  const total = m.minutes * 60, elapsed = Math.floor((Date.now() - m.startedAt) / 1000);
+  const left = total - elapsed, over = left <= 0;
+  const v = Math.abs(over ? elapsed - total : left);
+  $('#focus-timer').textContent = (over ? '+' : '') + String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0');
+  $('#focus-timer').classList.toggle('over', over);
+  $('#focus-hint').textContent = over ? '시간 끝! 다 했으면 완료를 눌러요' : (wake.supported ? '숙제하는 동안 화면이 꺼지지 않아요' : '');
+  if (over && !m.alerted) { m.alerted = true; save(); sfx.chime(); }
+}
+$('#btn-start').addEventListener('click', () => {
+  const m = focusMission; if (!m || m.status !== 'todo') return;
+  m.status = 'doing'; m.startedAt = Date.now(); m.alerted = false; save();
+  screens.focus.classList.remove('ready'); sfx.tick(); tickFocus();
+});
+$('#btn-done').addEventListener('click', () => { const m = focusMission; leaveFocus(); completeMission(m); });
+$('#btn-quit').addEventListener('click', () => { leaveFocus(); renderGarage(); });   // 시작 전이면 todo 그대로   // 진행 중 상태 유지, 나중에 "이어서"
+
+/* =====================================================================
+   5d. 꾸미기 — 도색·위장(캔버스 텍스처)·마킹(데칼)
+   ===================================================================== */
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+function seeded(seed) { let x = seed; return () => (x = (x * 1664525 + 1013904223) % 4294967296) / 4294967296; }
+const texCache = new Map();
+function camoTexture(baseId, camoId) {
+  const key = baseId + '|' + camoId; if (texCache.has(key)) return texCache.get(key);
+  const base = BASE_COLORS.find(b => b.id === baseId) || BASE_COLORS[0];
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d');
+  c.fillStyle = hex(base.hex); c.fillRect(0, 0, 256, 256);
+  const rnd = seeded(7);
+  const blob = (col, r0, r1, n) => { c.fillStyle = col; for (let i = 0; i < n; i++) { const x = rnd()*256, y = rnd()*256, r = r0 + rnd()*(r1-r0);
+    c.beginPath(); for (let a = 0; a < 8; a++) { const ang = a/8*Math.PI*2, rr = r*(0.7+rnd()*0.5); c.lineTo(x+Math.cos(ang)*rr, y+Math.sin(ang)*rr); } c.closePath(); c.fill(); } };
+  if (camoId === 'tricolor') { blob('#6b6b3a', 22, 48, 14); blob('#7a4a2e', 18, 40, 12); }
+  else if (camoId === 'winter') { c.fillStyle = '#e9ecef'; c.fillRect(0, 0, 256, 256); blob(hex(base.hex), 10, 26, 18); blob('#d5d9de', 14, 30, 10); }
+  else if (camoId === 'digital') { const cols = [hex(base.hex), '#4f5a3c', '#8c8f7a', '#3b3f33']; for (let y = 0; y < 256; y += 16) for (let x = 0; x < 256; x += 16) { c.fillStyle = cols[Math.floor(rnd()*4)]; c.fillRect(x, y, 16, 16); } }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  texCache.set(key, t); return t;
+}
+function markTexture(kind, country, number) {          // 데칼용 128×64 투명 캔버스
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const c = cv.getContext('2d');
+  c.clearRect(0, 0, 128, 64); c.lineWidth = 4; c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (kind === 'national') {
+    if (country === '독일') {   // 발켄크로이츠: 흰 테두리 + 검은 십자
+      c.fillStyle = '#fff'; c.fillRect(40, 22, 48, 20); c.fillRect(54, 8, 20, 48);
+      c.fillStyle = '#111'; c.fillRect(44, 26, 40, 12); c.fillRect(58, 12, 12, 40);
+    }
+    else { c.fillStyle = country === '소련' ? '#d33' : '#fff'; c.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 10 : 24, a = -Math.PI/2 + i*Math.PI/5; c.lineTo(64+Math.cos(a)*r, 32+Math.sin(a)*r); } c.closePath(); c.fill(); }
+  } else if (kind === 'number') {
+    c.font = '700 44px ui-monospace, Menlo, monospace'; c.strokeStyle = '#fff'; c.lineWidth = 6; c.strokeText(number, 64, 34); c.fillStyle = '#c62828'; c.fillText(number, 64, 34);
+  } else if (kind === 'shield') { c.fillStyle = '#fff'; c.beginPath(); c.moveTo(44, 10); c.lineTo(84, 10); c.lineTo(84, 36); c.quadraticCurveTo(64, 58, 44, 36); c.closePath(); c.fill(); c.fillStyle = '#1e5aa8'; c.fillRect(60, 14, 8, 30); c.fillRect(50, 22, 28, 8); }
+  else if (kind === 'arrow') { c.fillStyle = '#ffd447'; c.beginPath(); c.moveTo(30, 26); c.lineTo(74, 26); c.lineTo(74, 14); c.lineTo(100, 32); c.lineTo(74, 50); c.lineTo(74, 38); c.lineTo(30, 38); c.closePath(); c.fill(); }
+  else if (kind === 'bolt') { c.fillStyle = '#ffd447'; c.beginPath(); c.moveTo(70, 6); c.lineTo(46, 36); c.lineTo(62, 36); c.lineTo(54, 60); c.lineTo(82, 26); c.lineTo(66, 26); c.closePath(); c.fill(); }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const decals = {};                                      // 데칼 평면 (양쪽 대칭)
+function decalMesh(w, h) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide }));
+  m.visible = false; return m;
+}
+function ensureDecals() {
+  if (decals.ready) return;
+  // PlaneGeometry는 +Z를 향함 → 우측(+Z)은 그대로, 좌측은 180° 돌림. 포탑 쉬르첸의 기울기(±0.08)만큼 맞춤
+  const face = s => (s > 0 ? 0 : Math.PI);
+  decals.number = [-1, 1].map(s => { const m = decalMesh(0.8, 0.4); m.position.set(-0.55, 0.40, s * 1.43); m.rotation.y = face(s) - s * 0.08; turret.add(m); return m; });
+  decals.national = [-1, 1].map(s => { const m = decalMesh(0.6, 0.3); m.position.set(1.4, 0.75, s * 1.55); m.rotation.y = face(s); tank.add(m); return m; });
+  decals.unit = [-1, 1].map(s => { const m = decalMesh(0.6, 0.3); m.position.set(-1.6, 0.75, s * 1.55); m.rotation.y = face(s); tank.add(m); return m; });
+  decals.ready = true;
+}
+function applyDecor(d) {
+  ensureDecals();
+  const base = BASE_COLORS.find(b => b.id === d.base) || BASE_COLORS[0];
+  const tex = d.camo && d.camo !== 'none' ? camoTexture(base.id, d.camo) : null;
+  M.yellow.map = tex; M.yellow.color.set(tex ? 0xffffff : base.hex); M.yellow.needsUpdate = true;
+  M.yellowDark.map = tex; M.yellowDark.color.set(tex ? 0xd0d0d0 : new THREE.Color(base.hex).multiplyScalar(0.86)); M.yellowDark.needsUpdate = true;
+  const country = (TANKS.find(t => t.id === state.tank) || TANKS[0]).country;
+  const setD = (arr, kind, on, arg) => arr.forEach(m => { m.visible = !!on; if (on) { m.material.map && m.material.map.dispose(); m.material.map = markTexture(kind, country, arg); m.material.needsUpdate = true; } });
+  setD(decals.national, 'national', d.national);
+  setD(decals.unit, d.unit, d.unit && d.unit !== 'none');
+  setD(decals.number, 'number', d.number, d.number);
+}
+// ---- 꾸미기 화면 ----
+let decorTarget = 'build';                              // 'build' | 차고 목록 index
+const decorObj = () => decorTarget === 'build' ? state.decor : state.garage[decorTarget].decor;
+function enterDecor(target) {
+  decorTarget = target;
+  const g = target === 'build' ? null : state.garage[target];
+  $('#decor-title').textContent = g ? `${TANKS.find(t => t.id === g.tank).name} · ${g.month} 완성` : '꾸미기';
+  renderDecor(); show('decor');
+}
+function swatchBtn(parent, on, inner, title, onClick) {
+  const b = document.createElement('button'); b.className = 'sw' + (on ? ' on' : ''); b.title = title; b.innerHTML = inner;
+  b.addEventListener('click', onClick); parent.appendChild(b); return b;
+}
+function renderDecor() {
+  const d = decorObj(), fin = state.build.finish, viewing = decorTarget !== 'build';
+  const unlocked = id => viewing || fin.includes(id);
+  const country = TANKS.find(t => t.id === (viewing ? state.garage[decorTarget].tank : state.tank)).country;
+  const sec = (id, ok) => { const el = $('#dsec-' + id); el.classList.toggle('locked', !ok); el.querySelector('h3 span').textContent = ok ? '' : '🔒 마감 주에 해금'; return el.querySelector('.swatches'); };
+  const sb = sec('base', unlocked('paint')); sb.innerHTML = '';
+  for (const b of BASE_COLORS) swatchBtn(sb, d.base === b.id, `<div style="width:100%;height:100%;background:${hex(b.hex)};display:grid;place-items:center;color:#fff;font-size:12px;text-shadow:0 1px 2px #000">${b.country === country ? '기본' : ''}</div>`, b.name, () => { if (!unlocked('paint')) return; d.base = b.id; commitDecor(); });
+  const sc = sec('camo', unlocked('camo')); sc.innerHTML = '';
+  for (const cm of CAMOS) { const cv = camoTexture(d.base, cm.id).image; swatchBtn(sc, d.camo === cm.id, '', cm.name, () => { if (!unlocked('camo')) return; d.camo = cm.id; commitDecor(); }).appendChild(cv.cloneNode ? (() => { const c2 = document.createElement('canvas'); c2.width = c2.height = 64; c2.getContext('2d').drawImage(cv, 0, 0, 64, 64); return c2; })() : cv); }
+  const sm = sec('mark', unlocked('mark')); $('#mark-sw').innerHTML = '';
+  const mk = $('#mark-sw');
+  swatchBtn(mk, d.national, `<canvas></canvas>`, '국적 마크', () => { if (!unlocked('mark')) return; d.national = !d.national; commitDecor(); }).querySelector('canvas').replaceWith(markTexture('national', country).image);
+  for (const u of UNIT_MARKS) swatchBtn(mk, d.unit === u.id, u.id === 'none' ? '없음' : '<canvas></canvas>', u.name, () => { if (!unlocked('mark')) return; d.unit = u.id; commitDecor(); }).querySelector('canvas')?.replaceWith(markTexture(u.id, country).image);
+  $('#num-val').textContent = (d.number || '').padEnd(3, '-');
+  const pad = $('#num-pad'); pad.innerHTML = '';
+  for (let i = 0; i <= 9; i++) { const b = document.createElement('button'); b.textContent = i; b.addEventListener('click', () => { if (!unlocked('mark') || (d.number || '').length >= 3) return; d.number = (d.number || '') + i; commitDecor(); }); pad.appendChild(b); }
+  $('#num-clear').onclick = () => { if (!unlocked('mark')) return; d.number = ''; commitDecor(); };
+}
+function commitDecor() { save(); applyDecor(decorObj()); renderDecor(); sfx.tick(); }
+$('#btn-decor-close').addEventListener('click', () => {
+  if (decorTarget !== 'build') { const g = state.garage[decorTarget]; g.thumb = snapshotThumb(); save(); leaveView(); return; }
+  renderGarage(); show('garage');
+});
+
+/* =====================================================================
+   5e. 완성 연출 — 시운전(5초, 사격 없음) → 제원 카드 → 차고 등록 → 다음 등급 안내
+   ===================================================================== */
+let cere = null;                                        // { phase, t, wheels, startRot }
+function startCeremony() {
+  // 남은 부품은 완성 검수에서 마무리 (회색은 그대로 둔다 — 과목 편식의 흔적)
+  for (const p of parts()) if (!state.attached.some(a => a.id === p.id)) { state.attached.push({ id: p.id, ok: true }); showPart(p.id, true, false); }
+  save();
+  const wheels = []; for (const [id, v] of partObjects) if (/^(bogie|roller|sprocket|idler)/.test(id)) v.obj.traverse(o => { if (o.isMesh) wheels.push(o); });
+  cere = { phase: 'intro', t: 0, wheels, startRot: tank.rotation.y, turretBase: turret.rotation.y };
+  const t = TANKS.find(x => x.id === state.tank);
+  $('#cere-title').textContent = `${t.name} 완성!`; $('#cere-title').classList.add('pop');
+  $('#cere-sub').textContent = '시운전을 시작합니다'; $('#spec-card').classList.remove('on'); $('#btn-cere-skip').style.display = '';
+  sfx.chime(); show('cere');
+}
+function stepCeremony(dt) {
+  if (!cere) return;
+  cere.t += dt;
+  if (cere.phase === 'intro') { tank.rotation.y += dt * 0.8; if (cere.t > 1.6) { cere.phase = 'drive'; cere.t = 0; $('#cere-sub').textContent = '시운전 중…'; sfx.whoosh(); } }
+  else if (cere.phase === 'drive') {
+    const T = cere.t, dir = T < 2.5 ? 1 : -1;                                     // 앞으로 2.5초, 뒤로 2.5초
+    tank.translateX(dir * 1.1 * dt);
+    cere.wheels.forEach(w => w.rotation.z -= dir * dt * 4);
+    turret.rotation.y = cere.turretBase + Math.sin(T * 1.4) * 0.7;
+    if (T >= 5) endDrive();
+  }
+}
+function endDrive() {
+  cere.phase = 'card'; tank.position.set(0, 0, 0); turret.rotation.y = cere.turretBase;
+  layoutCenter = false; resize();                          // 카드가 오른쪽(세로: 아래)에 오도록 전차를 옆으로
+  $('#cere-sub').textContent = ''; $('#btn-cere-skip').style.display = 'none';
+  const t = TANKS.find(x => x.id === state.tank);
+  const rows = Object.entries({ 국가: t.country, 연도: `${t.year}년`, ...(t.spec || {}) }).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  const month = `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`;
+  const grey = state.attached.filter(a => !a.ok).length;
+  $('#spec-card').innerHTML = `<h2>${t.name}</h2><div class="sub">${t.nick} · 제원 카드</div><table>${rows}</table>
+    <div class="badge-row"><span class="medal">🏅 ${month} 완성</span>${grey ? `<span class="badge m-misc">회색 부품 ${grey}개</span>` : '<span class="badge m-armor">전 부품 정품</span>'}</div>
+    <div id="cere-actions"><button id="btn-cere-register" class="btn">차고에 등록</button></div>`;
+  $('#spec-card').classList.add('on');
+  $('#btn-cere-register').addEventListener('click', registerToGarage);
+}
+$('#btn-cere-skip').addEventListener('click', () => { if (cere && cere.phase !== 'card') endDrive(); });
+function snapshotThumb() {                              // 가운데 구도로 한 프레임 찍어 320×200 썸네일
+  const keep = layoutCenter; layoutCenter = true; resize(); renderer.render(scene, camera); layoutCenter = keep; resize();
+  const src = canvas, cv = document.createElement('canvas'); cv.width = 320; cv.height = 200;
+  const sw = src.width, sh = src.height, s = Math.min(sw / 320, sh / 200) * 0.9;
+  cv.getContext('2d').drawImage(src, (sw - 320 * s) / 2, (sh - 200 * s) / 2 + sh * 0.04, 320 * s, 200 * s, 0, 0, 320, 200);
+  return cv.toDataURL('image/jpeg', 0.7);
+}
+function registerToGarage() {
+  const t = TANKS.find(x => x.id === state.tank);
+  const before = { basic: tierUnlocked('basic'), mid: tierUnlocked('mid'), modern: tierUnlocked('modern') };
+  state.garage.push({ tank: state.tank, month: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`, decor: { ...state.decor }, grey: state.attached.filter(a => !a.ok).length, thumb: snapshotThumb(), completedAt: Date.now() });
+  const newly = TIERS.find(x => !before[x.id] && tierUnlocked(x.id));
+  // 새 조립 준비: 전차 선택으로
+  state.tank = null; state.attached = []; state.decor = defaultDecor();
+  state.build = { stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' };
+  save(); cere = null; tank.rotation.y = 0;
+  alert(newly ? `🎉 ${newly.name} 전차가 열렸어요! 다음 달 전차를 골라요.` : `${t.name}이(가) 차고에 등록됐어요. 다음 달 전차를 골라요.`);
+  pendingTank = null; buildTank(parts()); applyAttached(); applyDecor(state.decor); renderSelect(); show('select');
+}
+
+/* =====================================================================
+   5f. 차고 목록(도감) — 완성한 전차 + 잠긴 등급 실루엣, 3D 보기·도색 변경
+   ===================================================================== */
+let viewBackup = null;
+function enterList() {
+  const body = $('#list-body'); body.innerHTML = '';
+  const done = document.createElement('div'); done.innerHTML = `<h3>완성한 전차 ${state.garage.length}대</h3>`; const g1 = document.createElement('div'); g1.className = 'gcards';
+  state.garage.forEach((g, i) => {
+    const t = TANKS.find(x => x.id === g.tank), base = BASE_COLORS.find(b => b.id === g.decor.base) || BASE_COLORS[0];
+    const c = document.createElement('button'); c.className = 'gcard';
+    c.innerHTML = `<div class="gthumb">${g.thumb ? `<img src="${g.thumb}" alt="">` : THUMBS[g.tank] || THUMBS.generic}</div><b>${t.name}</b><small>${t.country} · ${g.month}</small><small><i class="chip" style="background:${hex(base.hex)}"></i>${base.name}${g.decor.camo !== 'none' ? ' · ' + CAMOS.find(x => x.id === g.decor.camo).name : ''}${g.decor.number ? ' · No.' + g.decor.number : ''}</small>`;
+    c.addEventListener('click', () => enterView(i)); g1.appendChild(c);
+  });
+  if (!state.garage.length) g1.innerHTML = '<p class="hint">아직 완성한 전차가 없어요. 한 달 동안 조립해서 첫 전차를 등록해요.</p>';
+  done.appendChild(g1); body.appendChild(done);
+  for (const tier of TIERS) {
+    const wrap = document.createElement('div'); wrap.innerHTML = `<h3>${tier.name} ${tierUnlocked(tier.id) ? '' : '🔒'}</h3>`;
+    const grid = document.createElement('div'); grid.className = 'gcards';
+    for (const t of TANKS.filter(x => x.tier === tier.id)) {
+      const n = state.garage.filter(g => g.tank === t.id).length;
+      const c = document.createElement('div'); c.className = 'gcard' + (n ? '' : ' locked');
+      c.innerHTML = `<div class="gthumb">${THUMBS[t.id] || THUMBS.generic}</div><b>${t.name}</b><small>${t.country} · ${t.year}년${n ? ` · ${n}대 완성` : tierUnlocked(tier.id) ? (t.ready ? ' · 미완성' : ' · 모델 준비 중') : ' · 잠김'}</small>`;
+      grid.appendChild(c);
+    }
+    wrap.appendChild(grid); body.appendChild(wrap);
+  }
+  show('list');
+}
+$('#btn-list-close').addEventListener('click', () => { if (state.tank) { renderGarage(); show('garage'); } else { renderSelect(); show('select'); } });
+function enterView(i) {                                 // 완성 전차를 3D로 보기 + 도색 변경
+  viewBackup = { attached: state.attached, decor: state.decor, tank: state.tank };
+  const g = state.garage[i];
+  state.tank = g.tank; state.attached = parts().map(p => ({ id: p.id, ok: true }));
+  buildTank(parts()); applyAttached(); applyDecor(g.decor);
+  enterDecor(i);
+}
+function leaveView() {
+  state.tank = viewBackup.tank; state.attached = viewBackup.attached; state.decor = viewBackup.decor; viewBackup = null;
+  save(); buildTank(parts()); applyAttached(); applyDecor(state.decor);
+  enterList();
+}
+
+/* =====================================================================
+   5c. 부모 모드 — 비밀번호, 주간 미션 등록, 달성률, 설정, 데이터
+   ===================================================================== */
+// ---- 비밀번호 (6자리 숫자 키패드) ----
+let pinBuf = '', pinMode = 'check', pinFirst = '', pinDone = null, pinBack = 'garage';
+function openPin(onOk, mode) {
+  pinDone = onOk; pinBuf = ''; pinFirst = '';
+  pinMode = mode || (state.settings.pin ? 'check' : 'set');
+  $('#pin-title').textContent = pinMode === 'check' ? '부모 비밀번호' : '새 비밀번호 6자리';
+  $('#pin-msg').textContent = pinMode === 'set' ? (state.settings.pin ? '' : '처음이라 비밀번호를 정합니다') : '';
+  renderPin(); show('pin');
+}
+function renderPin() {
+  $('#pin-dots').querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i < pinBuf.length));
+}
+{
+  const pad = $('#pin-pad');
+  ['1','2','3','4','5','6','7','8','9','지움','0','←'].forEach(k => {
+    const b = document.createElement('button'); b.textContent = k; if (k === '지움' || k === '←') b.className = 'fn';
+    b.addEventListener('click', () => pinKey(k)); pad.appendChild(b);
+  });
+}
+function pinKey(k) {
+  if (k === '지움') pinBuf = '';
+  else if (k === '←') pinBuf = pinBuf.slice(0, -1);
+  else if (pinBuf.length < 6) pinBuf += k;
+  renderPin();
+  if (pinBuf.length < 6) return;
+  const v = pinBuf; pinBuf = '';
+  if (pinMode === 'check') {
+    if (v === state.settings.pin) { const f = pinDone; pinDone = null; f && f(); }
+    else { $('#pin-msg').textContent = '비밀번호가 달라요'; sfx.tick(); setTimeout(renderPin, 150); }
+  } else if (!pinFirst) {
+    pinFirst = v; $('#pin-title').textContent = '한 번 더 입력'; $('#pin-msg').textContent = ''; setTimeout(renderPin, 150);
+  } else if (v === pinFirst) {
+    state.settings.pin = v; save(); const f = pinDone; pinDone = null; f && f();
+  } else {
+    pinFirst = ''; $('#pin-title').textContent = '새 비밀번호 6자리'; $('#pin-msg').textContent = '두 번 입력이 달라요. 다시'; setTimeout(renderPin, 150);
+  }
+}
+$('#pin-cancel').addEventListener('click', () => { pinDone = null; show(pinBack); });
+
+// ---- 부모 화면 ----
+let planWeekOffset = 0, planDay = 0;
+function enterParent() {
+  pinBack = 'garage';
+  planWeekOffset = 0; planDay = Math.min(4, dow(new Date()));
+  renderPlan(); renderStats(); renderSettings();
+  show('parent');
+}
+$('#btn-parent-close').addEventListener('click', () => { if (state.tank) enterGarage(); else { renderSelect(); show('select'); } });
+$('#parent-tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  $('#parent-tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.ptab').forEach(x => x.classList.toggle('on', x.id === 'ptab-' + b.dataset.tab));
+  if (b.dataset.tab === 'stats') renderStats();
+});
+
+// ---- 미션 등록 ----
+const planWeek = () => addDays(weekKey(), planWeekOffset * 7);
+function planDayList(create) {
+  const wk = planWeek();
+  if (!state.plan[wk]) { if (!create) return null; state.plan[wk] = {}; }
+  if (!state.plan[wk][planDay]) { if (!create) return null; state.plan[wk][planDay] = specFor(addDays(wk, planDay)); }
+  return state.plan[wk][planDay];
+}
+function afterPlanChange() {
+  save();
+  if (planWeek() === weekKey() && addDays(planWeek(), planDay) === state.missions.date) rebuildToday();   // 오늘 것이면 즉시 반영
+  save(); renderPlan();
+}
+function renderPlan() {
+  const wk = planWeek();
+  $('#week-seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.w === planWeekOffset));
+  $('#week-range').textContent = `${wk.slice(5).replace('-', '/')} (월) ~ ${addDays(wk, 6).slice(5).replace('-', '/')} (일)`;
+  const tabs = $('#day-tabs'); tabs.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const b = document.createElement('button');
+    const custom = state.plan[wk] && state.plan[wk][i];
+    const n = custom ? custom.length : specFor(addDays(wk, i)).length;
+    b.innerHTML = `${DOW_NAMES[i]}<small>${n}개${custom ? '' : ' (기본)'}</small>`;
+    b.classList.toggle('on', i === planDay);
+    b.addEventListener('click', () => { planDay = i; renderPlan(); });
+    tabs.appendChild(b);
+  }
+  const rows = $('#plan-rows'); rows.innerHTML = '';
+  const list = planDayList(false) || specFor(addDays(wk, planDay));
+  const custom = !!planDayList(false);
+  list.forEach((m, idx) => {
+    const r = document.createElement('div'); r.className = 'mrow';
+    const subj = document.createElement('select');
+    Object.keys(SUBJECTS).forEach(sname => { const o = new Option(sname, sname); o.selected = sname === m.subject; subj.add(o); });
+    const title = document.createElement('input'); title.type = 'text'; title.placeholder = '분량 (예: 문제집 12~13쪽)'; title.value = m.note || '';
+    const mins = document.createElement('select');
+    DURATIONS.forEach(d => { const o = new Option(`${d}분`, d); o.selected = d === m.minutes; mins.add(o); });
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×';
+    const commit = () => {
+      const l = planDayList(true); const it = l[idx];
+      it.subject = subj.value; it.minutes = +mins.value;
+      it.note = title.value.trim(); it.title = it.note ? `${subj.value} · ${it.note}` : `${subj.value} 숙제`;
+      afterPlanChange();
+    };
+    subj.addEventListener('change', commit); mins.addEventListener('change', commit); title.addEventListener('change', commit);
+    del.addEventListener('click', () => { planDayList(true).splice(idx, 1); afterPlanChange(); });
+    r.append(subj, title, mins, del); rows.appendChild(r);
+  });
+  if (!list.length) rows.innerHTML = '<p class="hint">이 날은 미션이 없습니다.</p>';
+  $('#btn-add-mission').textContent = custom || !list.length ? '+ 미션 추가' : '+ 미션 추가 (기본 목록을 편집)';
+}
+$('#week-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; planWeekOffset = +b.dataset.w; renderPlan(); });
+$('#btn-add-mission').addEventListener('click', () => {
+  const l = planDayList(true);
+  if (l.length >= 5) { alert('하루 최대 5개입니다.'); return; }
+  l.push({ subject: '수학', title: '수학 숙제', minutes: state.settings.defaultMinutes }); afterPlanChange();
+});
+$('#btn-copy-prev').addEventListener('click', () => {
+  const src = addDays(planWeek(), -7);
+  const from = state.plan[src];
+  if (!from) { alert('지난 주에 등록한 미션이 없습니다.'); return; }
+  if (state.plan[planWeek()] && !confirm('이 주에 등록된 미션을 지난 주 것으로 덮어쓸까요?')) return;
+  state.plan[planWeek()] = JSON.parse(JSON.stringify(from)); afterPlanChange();
+});
+
+// ---- 달성률 ----
+function renderStats() {
+  const t = todayKey(); const today = itemsOn(t);
+  const ws = weekStats();
+  let mp = 0, md = 0;
+  for (let i = 0; i < 31; i++) { const k = addDays(t, -i); if (k.slice(0, 7) !== t.slice(0, 7)) break; const it = itemsOn(k); mp += it.length; md += it.filter(m => m.status === 'done').length; }
+  const pct = (d, p) => p ? Math.round(d / p * 100) + '%' : '–';
+  $('#stat-grid').innerHTML = [
+    ['오늘', today.filter(m => m.status === 'done').length, today.length],
+    ['이번 주', ws.done, ws.planned], ['이번 달', md, mp],
+  ].map(([n, d, p]) => `<div class="stat"><small>${n}</small><b>${pct(d, p)}</b><small>${d} / ${p}</small></div>`).join('');
+  // 모듈별: 최근 28일
+  const per = {}; for (const k in MODULES) per[k] = { p: 0, d: 0 };
+  for (let i = 0; i < 28; i++) for (const m of itemsOn(addDays(t, -i))) { const mod = SUBJECTS[m.subject] || 'misc'; per[mod].p++; if (m.status === 'done') per[mod].d++; }
+  const greyByMod = {}; for (const a of state.attached) if (!a.ok) { const p = parts().find(x => x.id === a.id); greyByMod[p.module] = (greyByMod[p.module] || 0) + 1; }
+  $('#module-bars').innerHTML = Object.entries(MODULES).map(([k, v]) => {
+    const { p, d } = per[k]; const w = p ? d / p * 100 : 0;
+    return `<div class="mbar"><span class="badge ${v.cls}">${v.name}</span><div class="track"><i style="width:${w}%;background:var(--c-${k})"></i></div><span>${d}/${p}${greyByMod[k] ? ` · 회색 ${greyByMod[k]}` : ''}</span></div>`;
+  }).join('');
+  $('#recent-days').innerHTML = Array.from({ length: 14 }, (_, i) => addDays(t, -i)).map(k => {
+    const it = itemsOn(k); if (!it.length) return '';
+    const d = new Date(k + 'T00:00:00');
+    return `<div class="mbar"><span>${k.slice(5).replace('-', '/')} (${DOW_NAMES[dow(d)]})</span><div class="track"><i style="width:${it.filter(m => m.status === 'done').length / it.length * 100}%;background:var(--ok)"></i></div><span>${it.filter(m => m.status === 'done').length}/${it.length}</span></div>`;
+  }).join('') || '<p class="hint">아직 기록이 없습니다.</p>';
+}
+
+// ---- 설정 ----
+function seg(el, options, current, onPick) {
+  el.innerHTML = '';
+  for (const [label, val] of options) {
+    const b = document.createElement('button'); b.textContent = label; b.classList.toggle('on', val === current);
+    b.addEventListener('click', () => { onPick(val); save(); renderSettings(); }); el.appendChild(b);
+  }
+}
+function renderSettings() {
+  const st = state.settings;
+  seg($('#set-perday'), [1,2,3,4,5].map(n => [`${n}개`, n]), st.missionsPerDay, v => { st.missionsPerDay = v; });
+  seg($('#set-unlock'), [0.6,0.7,0.8,0.9,1].map(r => [`${Math.round(r*100)}%`, r]), st.unlockRatio, v => { st.unlockRatio = v; });
+  seg($('#set-minutes'), DURATIONS.map(d => [`${d}분`, d]), st.defaultMinutes, v => { st.defaultMinutes = v; });
+  seg($('#set-quality'), [['낮음', 'low'], ['높음', 'high']], st.quality, v => { if (st.quality !== v) { st.quality = v; applyQuality(); } });
+}
+$('#btn-pin-change').addEventListener('click', () => { pinBack = 'parent'; openPin(() => { alert('비밀번호를 바꿨습니다.'); show('parent'); }, 'set'); });
+
+// ---- 데이터 ----
+$('#btn-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `tankPlanner-${todayKey()}.json`; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+$('#btn-import').addEventListener('click', () => $('#file-import').click());
+$('#file-import').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const s = JSON.parse(await f.text());
+    if (!s || !(s.version === 1 || s.version === 2) || !('attached' in s)) throw new Error('형식이 다릅니다');
+    if (!confirm(`가져올까요? 전차 ${s.tank || '없음'}, 부품 ${s.attached.length}개. 현재 데이터는 덮어써집니다.`)) return;
+    state = migrate(s); save(); location.reload();
+  } catch (err) { alert('가져오기 실패: ' + err.message); }
+});
+$('#btn-test-unlock').addEventListener('click', () => {
+  if (!state.tank) { alert('먼저 전차를 골라야 합니다.'); return; }
+  advanceStage(); save(); alert(state.build.status === 'ceremony' ? '완성 처리됨 — 닫기를 누르면 완성 연출' : `${state.build.stage}주차(${STAGE_NAMES[state.build.stage]})로 이동`);
+});
+$('#btn-test-fill').addEventListener('click', () => {
+  if (!state.tank) return;
+  if (state.build.stage === 4) state.build.finish = FINISH_STEPS.map(f => f.id);
+  else for (const p of stageParts(state.build.stage)) if (!state.attached.some(a => a.id === p.id)) state.attached.push({ id: p.id, ok: true });
+  save(); applyAttached(); alert('결합 완료');
+});
+$('#btn-reset').addEventListener('click', () => {
+  if (!confirm('정말 모든 진행을 지울까요? 되돌릴 수 없습니다.')) return;
+  const pin = state.settings.pin;
+  state = defaultState(); state.settings.pin = pin; save(); location.reload();
+});
+
+/* =====================================================================
+   6. 시작
+   ===================================================================== */
+buildTank(parts()); applyDecor(state.decor);   // 선택 화면 뒤에도 (빈) 전차 바닥이 보이도록
+resize();
+requestAnimationFrame(loop);
+if (state.tank) enterGarage(); else { renderSelect(); show('select'); }
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW 등록 실패:', err)));
+}
+</script>
+</body>
+</html>
