@@ -260,7 +260,8 @@
   #day-tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
   #day-tabs button small { display: block; font-weight: 400; font-size: 12px; opacity: .7; }
   .mrow { display: grid; grid-template-columns: 120px 1fr 96px 52px; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .mrow .del { min-height: 48px; border: 0; border-radius: 10px; background: #f1d9d5; color: #a33; font-size: 20px; font-weight: 700; }
+  .srow { display: grid; grid-template-columns: 1fr 170px 52px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .srow .del, .mrow .del { min-height: 48px; border: 0; border-radius: 10px; background: #f1d9d5; color: #a33; font-size: 20px; font-weight: 700; }
   @media (max-width: 600px) { .mrow { grid-template-columns: 1fr 1fr; } .mrow input { grid-column: 1 / -1; } }
   .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .stat { background: #f7f3ea; border-radius: 12px; padding: 12px; text-align: center; }
@@ -387,7 +388,7 @@
   <div class="ptab on" id="ptab-plan">
     <div class="pcard">
       <div class="row-btns" style="align-items:center; justify-content:space-between">
-        <div class="seg" id="week-seg"><button data-w="0" class="on">이번 주</button><button data-w="1">다음 주</button></div>
+        <div class="seg" id="week-seg"><button data-w="-1">매주 반복</button><button data-w="0" class="on">이번 주</button><button data-w="1">다음 주</button></div>
         <button id="btn-copy-prev" class="btn ghost">지난 주 복사</button>
       </div>
       <p class="hint" id="week-range"></p>
@@ -395,8 +396,8 @@
     <div id="day-tabs"></div>
     <div class="pcard">
       <div id="plan-rows"></div>
-      <div class="row-btns"><button id="btn-add-mission" class="btn ghost">+ 미션 추가</button></div>
-      <p class="hint">등록하지 않은 평일은 기본 과목(하루 미션 수만큼)이 자동으로 들어갑니다. 주말은 등록한 것만.</p>
+      <div class="row-btns"><button id="btn-add-mission" class="btn ghost">+ 미션 추가</button><button id="btn-revert-day" class="btn ghost">반복 일정으로 되돌리기</button></div>
+      <p class="hint" id="plan-hint"></p>
     </div>
   </div>
 
@@ -408,7 +409,10 @@
   </div>
 
   <div class="ptab" id="ptab-settings">
-    <div class="pcard"><h3>하루 미션 수 (기본 생성)</h3><div class="seg" id="set-perday"></div></div>
+    <div class="pcard"><h3>과목</h3>
+      <div id="subject-rows"></div>
+      <div class="row-btns"><button id="btn-add-subject" class="btn ghost">+ 과목 추가</button></div>
+      <p class="hint">과목마다 전차의 어느 부위(모듈)와 연결할지 고릅니다. 그 과목 숙제를 하면 그 부위 부품이 제 색으로 붙어요. 이름을 바꾸면 등록된 미션에도 함께 바뀝니다.</p></div>
     <div class="pcard"><h3>다음 단계 해금 기준 (주간 달성률)</h3><div class="seg" id="set-unlock"></div></div>
     <div class="pcard"><h3>타이머 기본값</h3><div class="seg" id="set-minutes"></div></div>
     <div class="pcard"><h3>3D 품질</h3><div class="seg" id="set-quality"></div>
@@ -450,7 +454,7 @@ const MODULES = {
   armor:  { name: '장갑·궤도',   cls: 'm-armor' },
   misc:   { name: '승무원 장비', cls: 'm-misc' },
 };
-const SUBJECTS = {
+const DEFAULT_SUBJECTS = {
   '수학':     'gun',
   '수학패드': 'engine',
   '영어':     'radio',
@@ -557,13 +561,22 @@ const DURATIONS = [20, 30, 40, 50];   // 미션 시간 선택지(분)
    2. 저장 (localStorage 키 tankPlanner)
    ===================================================================== */
 const KEY = 'tankPlanner';
+// 예전 버전의 자동 기본 과목 (이전 저장을 '매주 반복' 일정으로 옮길 때만 사용)
+const DEFAULT_ROTATION = [
+  ['수학', '영어', '구몬'], ['수학패드', '수학', '영어'], ['구몬', '수학패드', '수학'],
+  ['영어', '구몬', '수학패드'], ['수학', '영어', '구몬'],
+];
 const todayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function weekKey(d = new Date()) {   // 그 주 월요일 날짜
   const m = new Date(d); const day = (m.getDay() + 6) % 7; m.setDate(m.getDate() - day); return todayKey(m);
 }
-const defaultSettings = () => ({ missionsPerDay: 3, unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', pin: null });
+const defaultSubjects = () => Object.entries(DEFAULT_SUBJECTS).map(([name, module]) => ({ name, module }));
+const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', pin: null, subjects: defaultSubjects() });
+// 과목 → 모듈 (부모가 정한 과목 목록 기준, 지운 과목은 승무원 장비로)
+const modOf = name => ((state.settings.subjects || []).find(x => x.name === name) || {}).module || 'misc';
 const defaultState = () => ({
-  version: 3, tank: null,
+  version: 4, tank: null,
+  template: {},                          // 매주 반복 일정 { 0(월)..6(일): [ {subject, note, title, minutes} ] } — 부모가 등록
   build: { stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' },   // status: building | ceremony
   decor: defaultDecor(),
   garage: [],                            // 완성한 전차 [{ tank, month, decor, thumb, completedAt }]
@@ -577,7 +590,7 @@ let state = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.version >= 1 && s.version <= 3) return migrate(s);
+    if (s && s.version >= 1 && s.version <= 4) return migrate(s);
   } catch {}
   return defaultState();
 }
@@ -588,29 +601,30 @@ function migrate(s) {
     const maxStage = Math.max(1, ...(s.attached || []).map(a => (PZ4_PARTS.find(p => p.id === a.id) || {}).stage || 1));
     s.build = { stage: maxStage, startWeek: weekKey(), evaluated: [], finish: [], status: 'building' };
   }
+  if (s.version === 3) {   // 자동 기본 과목 → 부모가 고칠 수 있는 '매주 반복' 일정으로 옮김 (쓰던 흐름 유지)
+    s.version = 4;
+    const n = (s.settings && s.settings.missionsPerDay) || 3, mins = (s.settings && s.settings.defaultMinutes) || 20;
+    s.template = {}; for (let i = 0; i < 5; i++) s.template[i] = DEFAULT_ROTATION[i].slice(0, n).map(x => ({ subject: x, note: '', title: `${x} 숙제`, minutes: mins }));
+  }
+  s.template = s.template || {};
   s.build = Object.assign({ stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' }, s.build || {});
   s.decor = Object.assign(defaultDecor(), s.decor || {}); s.garage = s.garage || [];
-  s.settings = Object.assign(defaultSettings(), s.settings || {});
+  s.settings = Object.assign(defaultSettings(), s.settings || {}); delete s.settings.missionsPerDay;
+  if (!Array.isArray(s.settings.subjects) || !s.settings.subjects.length) s.settings.subjects = defaultSubjects();
   s.history = s.history || {}; s.plan = s.plan || {};
   return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn('저장 실패', e); } }
 
-// 오늘 미션이 없으면 기본 미션 생성 (부모 모드는 3단계 — 지금은 요일별 기본 과목)
-const DEFAULT_ROTATION = [
-  ['수학', '영어', '구몬'], ['수학패드', '수학', '영어'], ['구몬', '수학패드', '수학'],
-  ['영어', '구몬', '수학패드'], ['수학', '영어', '구몬'], ['수학패드', '구몬', '영어'], ['영어', '수학', '구몬'],
-];
+
 const dow = d => (d.getDay() + 6) % 7;                 // 0=월 … 6=일
 const DOW_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
 function addDays(key, n) { const d = new Date(key + 'T00:00:00'); d.setDate(d.getDate() + n); return todayKey(d); }
-// 어떤 날의 미션 명세: 부모가 등록했으면 그것, 아니면 평일만 기본 과목
+// 어떤 날의 미션: 그 주에 따로 등록했으면 그것, 아니면 '매주 반복' 일정. 앱이 스스로 만드는 미션은 없음
 function specFor(dateKey) {
   const d = new Date(dateKey + 'T00:00:00'), wk = weekKey(d), i = dow(d);
   const planned = state.plan[wk] && state.plan[wk][i];
-  if (planned) return planned.map(x => ({ ...x }));
-  if (i >= 5) return [];
-  return DEFAULT_ROTATION[i].slice(0, state.settings.missionsPerDay).map(s => ({ subject: s, title: `${s} 숙제`, minutes: state.settings.defaultMinutes }));
+  return (planned || state.template[i] || []).map(x => ({ ...x }));
 }
 function ensureToday() {
   const t = todayKey();
@@ -627,7 +641,7 @@ function rebuildToday() {
   state.missions.items = specFor(t).map((sp, i) => {
     const o = old[i];
     if (o && o.status !== 'todo' && o.subject === sp.subject) return o;
-    return { id: `${t}-${i}`, subject: sp.subject, title: sp.title || `${sp.subject} 숙제`, minutes: sp.minutes || state.settings.defaultMinutes, status: 'todo' };
+    return { id: `${t}-${i}`, subject: sp.subject, note: sp.note || '', title: sp.title || `${sp.subject} 숙제`, minutes: sp.minutes || state.settings.defaultMinutes, status: 'todo' };
   });
 }
 // 통계용: 날짜별 항목 (지난 날 + 오늘)
@@ -988,7 +1002,7 @@ function renderGarage() {
   $('#today-str').textContent = state.missions.date.slice(5).replace('-', '/');
   const box = $('#missions'); box.innerHTML = '';
   for (const m of state.missions.items) {
-    const mod = MODULES[SUBJECTS[m.subject]];
+    const mod = MODULES[modOf(m.subject)];
     const el = document.createElement('div');
     el.className = 'mission ' + m.status;
     const label = m.status === 'todo' ? '시작' : m.status === 'doing' ? '이어서' : '완료됨';
@@ -998,7 +1012,11 @@ function renderGarage() {
     el.querySelector('.act').addEventListener('click', () => onMission(m));
     box.appendChild(el);
   }
-  if (!state.missions.items.length) box.innerHTML = '<div class="mission"><div class="title">오늘은 미션이 없어요</div><div class="meta">푹 쉬는 날</div></div>';
+  if (!state.missions.items.length) {
+    const none = !Object.keys(state.template).some(k => state.template[k].length) && !Object.keys(state.plan).length;
+    box.innerHTML = none ? '<div class="mission"><div class="title">아직 미션이 없어요</div><div class="meta">부모님이 "부모" 버튼에서 미션을 등록하면 여기에 나와요</div></div>'
+                         : '<div class="mission"><div class="title">오늘은 미션이 없어요</div><div class="meta">푹 쉬는 날</div></div>';
+  }
   const ws = weekStats();
   const need = Math.ceil(ws.planned * state.settings.unlockRatio);
   const left = Math.max(0, need - ws.done);
@@ -1024,7 +1042,7 @@ function onMission(m) {
 function completeMission(m) {
   m.status = 'done'; m.doneAt = Date.now(); save();
   renderGarage();
-  setTimeout(() => { attachNext(SUBJECTS[m.subject]); save(); renderGarage(); }, 350);   // 차고가 보인 뒤 결합
+  setTimeout(() => { attachNext(modOf(m.subject)); save(); renderGarage(); }, 350);   // 차고가 보인 뒤 결합
 }
 // 결합 규칙: 다음 부품이 붙는다. 모듈이 맞으면 제색, 아니면 회색.
 // 회색으로 붙는 경우, 같은 모듈의 기존 회색 부품이 있으면 하나를 제색으로 교체.
@@ -1075,7 +1093,7 @@ $('#btn-parent').addEventListener('click', () => openPin(() => enterParent()));
 let focusMission = null, focusTimer = null;
 function enterFocus(m) {
   focusMission = m;
-  const mod = MODULES[SUBJECTS[m.subject]];
+  const mod = MODULES[modOf(m.subject)];
   $('#focus-badge').className = 'badge ' + mod.cls; $('#focus-badge').textContent = mod.name;
   $('#focus-title').textContent = m.title;
   const ready = m.status === 'todo';
@@ -1378,7 +1396,8 @@ $('#pin-cancel').addEventListener('click', () => { pinDone = null; show(pinBack)
 let planWeekOffset = 0, planDay = 0;
 function enterParent() {
   pinBack = 'garage';
-  planWeekOffset = 0; planDay = Math.min(4, dow(new Date()));
+  const hasAny = Object.keys(state.template).some(k => state.template[k].length) || Object.keys(state.plan).length;
+  planWeekOffset = hasAny ? 0 : -1; planDay = hasAny ? dow(new Date()) : 0;   // 처음이면 '매주 반복'부터
   renderPlan(); renderStats(); renderSettings();
   show('parent');
 }
@@ -1391,39 +1410,50 @@ $('#parent-tabs').addEventListener('click', e => {
 });
 
 // ---- 미션 등록 ----
-const planWeek = () => addDays(weekKey(), planWeekOffset * 7);
+// planWeekOffset: -1 = 매주 반복 일정, 0 = 이번 주, 1 = 다음 주
+const isTemplate = () => planWeekOffset < 0;
+const planWeek = () => addDays(weekKey(), Math.max(0, planWeekOffset) * 7);
+const dayOverride = (wk, i) => state.plan[wk] && state.plan[wk][i];
+// 편집할 목록. 주 단위 편집은 처음 손대는 순간 반복 일정을 복사해 '이번 주만' 목록을 만든다
 function planDayList(create) {
+  if (isTemplate()) { if (!state.template[planDay]) { if (!create) return null; state.template[planDay] = []; } return state.template[planDay]; }
   const wk = planWeek();
-  if (!state.plan[wk]) { if (!create) return null; state.plan[wk] = {}; }
-  if (!state.plan[wk][planDay]) { if (!create) return null; state.plan[wk][planDay] = specFor(addDays(wk, planDay)); }
+  if (!dayOverride(wk, planDay)) {
+    if (!create) return null;
+    state.plan[wk] = state.plan[wk] || {};
+    state.plan[wk][planDay] = (state.template[planDay] || []).map(x => ({ ...x }));
+  }
   return state.plan[wk][planDay];
 }
-function afterPlanChange() {
-  save();
-  if (planWeek() === weekKey() && addDays(planWeek(), planDay) === state.missions.date) rebuildToday();   // 오늘 것이면 즉시 반영
-  save(); renderPlan();
+function afterPlanChange() { rebuildToday(); save(); renderPlan(); }   // 오늘 미션에 바로 반영 (진행 중·완료 항목은 유지)
+function subjectOptions(sel, current) {
+  const names = state.settings.subjects.map(x => x.name);
+  if (current && !names.includes(current)) names.push(current);          // 지운 과목도 기존 미션에서는 보이게
+  names.forEach(n => { const o = new Option(n, n); o.selected = n === current; sel.add(o); });
 }
 function renderPlan() {
-  const wk = planWeek();
+  const wk = planWeek(), tpl = isTemplate();
   $('#week-seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.w === planWeekOffset));
-  $('#week-range').textContent = `${wk.slice(5).replace('-', '/')} (월) ~ ${addDays(wk, 6).slice(5).replace('-', '/')} (일)`;
+  $('#week-range').textContent = tpl ? '여기서 정한 요일별 미션이 매주 자동으로 반복됩니다.'
+    : `${wk.slice(5).replace('-', '/')} (월) ~ ${addDays(wk, 6).slice(5).replace('-', '/')} (일) · 여기서 고친 요일은 이 주에만 적용`;
+  $('#btn-copy-prev').style.display = tpl ? 'none' : '';
   const tabs = $('#day-tabs'); tabs.innerHTML = '';
   for (let i = 0; i < 7; i++) {
     const b = document.createElement('button');
-    const custom = state.plan[wk] && state.plan[wk][i];
-    const n = custom ? custom.length : specFor(addDays(wk, i)).length;
-    b.innerHTML = `${DOW_NAMES[i]}<small>${n}개${custom ? '' : ' (기본)'}</small>`;
+    const own = !tpl && dayOverride(wk, i);
+    const n = tpl ? (state.template[i] || []).length : specFor(addDays(wk, i)).length;
+    b.innerHTML = `${DOW_NAMES[i]}<small>${n}개${tpl ? '' : own ? ' ·이 주만' : ''}</small>`;
     b.classList.toggle('on', i === planDay);
     b.addEventListener('click', () => { planDay = i; renderPlan(); });
     tabs.appendChild(b);
   }
   const rows = $('#plan-rows'); rows.innerHTML = '';
-  const list = planDayList(false) || specFor(addDays(wk, planDay));
-  const custom = !!planDayList(false);
+  const list = planDayList(false) || (tpl ? [] : specFor(addDays(wk, planDay)));
+  const own = !tpl && !!dayOverride(wk, planDay);
   list.forEach((m, idx) => {
     const r = document.createElement('div'); r.className = 'mrow';
     const subj = document.createElement('select');
-    Object.keys(SUBJECTS).forEach(sname => { const o = new Option(sname, sname); o.selected = sname === m.subject; subj.add(o); });
+    subjectOptions(subj, m.subject);
     const title = document.createElement('input'); title.type = 'text'; title.placeholder = '분량 (예: 문제집 12~13쪽)'; title.value = m.note || '';
     const mins = document.createElement('select');
     DURATIONS.forEach(d => { const o = new Option(`${d}분`, d); o.selected = d === m.minutes; mins.add(o); });
@@ -1438,19 +1468,29 @@ function renderPlan() {
     del.addEventListener('click', () => { planDayList(true).splice(idx, 1); afterPlanChange(); });
     r.append(subj, title, mins, del); rows.appendChild(r);
   });
-  if (!list.length) rows.innerHTML = '<p class="hint">이 날은 미션이 없습니다.</p>';
-  $('#btn-add-mission').textContent = custom || !list.length ? '+ 미션 추가' : '+ 미션 추가 (기본 목록을 편집)';
+  if (!list.length) rows.innerHTML = '<p class="hint">이 날은 미션이 없습니다. (쉬는 날)</p>';
+  $('#btn-revert-day').style.display = own ? '' : 'none';
+  $('#plan-hint').textContent = tpl ? '예: 월요일에 수학·영어·구몬을 넣어두면 매주 월요일마다 그 3개가 나옵니다. 하루 최대 5개.'
+    : own ? '이 요일은 이 주에만 따로 정한 목록입니다. "반복 일정으로 되돌리기"를 누르면 매주 반복 일정으로 돌아갑니다.'
+    : '지금은 매주 반복 일정이 보이는 중입니다. 여기서 고치면 이 주에만 적용되고, 반복 일정은 그대로입니다.';
 }
 $('#week-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; planWeekOffset = +b.dataset.w; renderPlan(); });
 $('#btn-add-mission').addEventListener('click', () => {
   const l = planDayList(true);
   if (l.length >= 5) { alert('하루 최대 5개입니다.'); return; }
-  l.push({ subject: '수학', title: '수학 숙제', minutes: state.settings.defaultMinutes }); afterPlanChange();
+  const first = state.settings.subjects[0] ? state.settings.subjects[0].name : '기타';
+  l.push({ subject: first, note: '', title: `${first} 숙제`, minutes: state.settings.defaultMinutes }); afterPlanChange();
+});
+$('#btn-revert-day').addEventListener('click', () => {
+  const wk = planWeek(); if (!dayOverride(wk, planDay)) return;
+  if (!confirm(`${DOW_NAMES[planDay]}요일을 매주 반복 일정으로 되돌릴까요?`)) return;
+  delete state.plan[wk][planDay]; if (!Object.keys(state.plan[wk]).length) delete state.plan[wk];
+  afterPlanChange();
 });
 $('#btn-copy-prev').addEventListener('click', () => {
   const src = addDays(planWeek(), -7);
   const from = state.plan[src];
-  if (!from) { alert('지난 주에 등록한 미션이 없습니다.'); return; }
+  if (!from) { alert('지난 주에 따로 고친 요일이 없습니다. (반복 일정은 이미 매주 나옵니다)'); return; }
   if (state.plan[planWeek()] && !confirm('이 주에 등록된 미션을 지난 주 것으로 덮어쓸까요?')) return;
   state.plan[planWeek()] = JSON.parse(JSON.stringify(from)); afterPlanChange();
 });
@@ -1468,7 +1508,7 @@ function renderStats() {
   ].map(([n, d, p]) => `<div class="stat"><small>${n}</small><b>${pct(d, p)}</b><small>${d} / ${p}</small></div>`).join('');
   // 모듈별: 최근 28일
   const per = {}; for (const k in MODULES) per[k] = { p: 0, d: 0 };
-  for (let i = 0; i < 28; i++) for (const m of itemsOn(addDays(t, -i))) { const mod = SUBJECTS[m.subject] || 'misc'; per[mod].p++; if (m.status === 'done') per[mod].d++; }
+  for (let i = 0; i < 28; i++) for (const m of itemsOn(addDays(t, -i))) { const mod = modOf(m.subject); per[mod].p++; if (m.status === 'done') per[mod].d++; }
   const greyByMod = {}; for (const a of state.attached) if (!a.ok) { const p = parts().find(x => x.id === a.id); greyByMod[p.module] = (greyByMod[p.module] || 0) + 1; }
   $('#module-bars').innerHTML = Object.entries(MODULES).map(([k, v]) => {
     const { p, d } = per[k]; const w = p ? d / p * 100 : 0;
@@ -1491,11 +1531,46 @@ function seg(el, options, current, onPick) {
 }
 function renderSettings() {
   const st = state.settings;
-  seg($('#set-perday'), [1,2,3,4,5].map(n => [`${n}개`, n]), st.missionsPerDay, v => { st.missionsPerDay = v; });
+  renderSubjects();
   seg($('#set-unlock'), [0.6,0.7,0.8,0.9,1].map(r => [`${Math.round(r*100)}%`, r]), st.unlockRatio, v => { st.unlockRatio = v; });
   seg($('#set-minutes'), DURATIONS.map(d => [`${d}분`, d]), st.defaultMinutes, v => { st.defaultMinutes = v; });
   seg($('#set-quality'), [['낮음', 'low'], ['높음', 'high']], st.quality, v => { if (st.quality !== v) { st.quality = v; applyQuality(); } });
 }
+function renameSubjectEverywhere(from, to) {
+  const fix = arr => (arr || []).forEach(m => { if (m.subject === from) { m.subject = to; m.title = m.note ? `${to} · ${m.note}` : `${to} 숙제`; } });
+  for (const k in state.template) fix(state.template[k]);
+  for (const wk in state.plan) for (const d in state.plan[wk]) fix(state.plan[wk][d]);
+  fix(state.missions.items);
+}
+function renderSubjects() {
+  const box = $('#subject-rows'); box.innerHTML = '';
+  state.settings.subjects.forEach((sub, idx) => {
+    const r = document.createElement('div'); r.className = 'srow';
+    const name = document.createElement('input'); name.type = 'text'; name.value = sub.name; name.maxLength = 12;
+    const mod = document.createElement('select');
+    Object.entries(MODULES).forEach(([k, v]) => { const o = new Option(v.name, k); o.selected = k === sub.module; mod.add(o); });
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×';
+    name.addEventListener('change', () => {
+      const v = name.value.trim();
+      if (!v) { name.value = sub.name; return; }
+      if (state.settings.subjects.some((x, j) => j !== idx && x.name === v)) { alert('같은 이름의 과목이 있습니다.'); name.value = sub.name; return; }
+      renameSubjectEverywhere(sub.name, v); sub.name = v; rebuildToday(); save(); renderSubjects(); renderPlan();
+    });
+    mod.addEventListener('change', () => { sub.module = mod.value; save(); });
+    del.addEventListener('click', () => {
+      if (state.settings.subjects.length <= 1) { alert('과목은 1개 이상 있어야 합니다.'); return; }
+      if (!confirm(`'${sub.name}' 과목을 목록에서 지울까요? 이미 등록된 미션은 그대로 남습니다.`)) return;
+      state.settings.subjects.splice(idx, 1); save(); renderSubjects(); renderPlan();
+    });
+    r.append(name, mod, del); box.appendChild(r);
+  });
+}
+$('#btn-add-subject').addEventListener('click', () => {
+  if (state.settings.subjects.length >= 12) { alert('과목은 12개까지입니다.'); return; }
+  let n = 1, name; do { name = `새 과목 ${n++}`; } while (state.settings.subjects.some(x => x.name === name));
+  state.settings.subjects.push({ name, module: 'misc' }); save(); renderSubjects();
+  const inputs = $('#subject-rows').querySelectorAll('input'); const last = inputs[inputs.length - 1]; last.focus(); last.select();
+});
 $('#btn-pin-change').addEventListener('click', () => { pinBack = 'parent'; openPin(() => { alert('비밀번호를 바꿨습니다.'); show('parent'); }, 'set'); });
 
 // ---- 데이터 ----
