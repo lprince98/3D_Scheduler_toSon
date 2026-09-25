@@ -1,5 +1,5 @@
 /* 오프라인용 서비스워커. 파일을 바꾸면 VERSION을 올릴 것 (그래야 태블릿이 새 파일을 받음) */
-const VERSION = 'monster3d-v8';
+const VERSION = 'monster3d-v9';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

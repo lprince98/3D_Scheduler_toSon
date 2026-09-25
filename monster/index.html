@@ -284,6 +284,7 @@
     <div id="topbar">
       <div id="nameTag"><span id="nameText">…</span><span class="type" id="typeText"></span></div>
       <div class="spacer"></div>
+      <a class="iconBtn" id="appsBtn" href="../" title="앱 선택" style="display:grid;place-items:center;width:auto;padding:0 14px;font-size:16px;font-weight:700;color:inherit;text-decoration:none">앱 선택</a>
       <button class="iconBtn" id="dexBtn" title="도감">📖</button>
       <button class="iconBtn" id="settingsBtn" title="설정">⚙️</button>
       <button class="iconBtn" id="dexBack" style="display:none;width:auto;padding:0 14px;font-size:16px;font-weight:700">← 돌아가기</button>
@@ -5355,11 +5356,11 @@ function viewDex(e) {   // 도감 몬스터를 3D로 보기 (최종 모습)
   dexView = e; $('dex').classList.remove('on');
   buildMonster(e.parts, e.growth, 3, e.type); setBackground(e.type); userYaw = 0;
   $('nameText').textContent = e.name; $('typeText').textContent = `${typeById(e.type).emoji} 도감 · ${+e.month.slice(5)}월`;
-  $('dexBtn').style.display = 'none'; $('settingsBtn').style.display = 'none'; $('dexBack').style.display = '';
+  $('dexBtn').style.display = 'none'; $('settingsBtn').style.display = 'none'; $('appsBtn').style.display = 'none'; $('dexBack').style.display = '';
   $('panel').style.display = 'none'; resize(); start();
 }
 $('dexBack').addEventListener('click', () => {
-  dexView = null; $('panel').style.display = ''; $('dexBtn').style.display = ''; $('settingsBtn').style.display = ''; $('dexBack').style.display = 'none';
+  dexView = null; $('panel').style.display = ''; $('dexBtn').style.display = ''; $('settingsBtn').style.display = ''; $('appsBtn').style.display = 'grid'; $('dexBack').style.display = 'none';
   if (state.monster) { buildCurrent(); setBackground(state.monster.type); updateNameTag(); } resize();
 });
 

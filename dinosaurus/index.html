@@ -167,6 +167,8 @@
   .pbar { display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: #fffdf7; border-bottom: 1px solid #eadfca; flex-wrap: wrap; }
   .tabs { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
   #parent button { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #d8c9ad; background: #fff; font-size: 16px; color: var(--ink); }
+  #pApps { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #d8c9ad; background: #fff; font-size: 16px; color: var(--ink);
+    display: inline-flex; align-items: center; text-decoration: none; }
   #parent button.sel, .tabs button.on { background: #6b5536; color: #fff; border-color: #6b5536; }
   #parent button.pri { background: #3f9a4a; color: #fff; border-color: #3f9a4a; }
   #parent button.warn { background: #fff0ec; color: #b23b1e; border-color: #e8b5a8; }
@@ -310,7 +312,7 @@
   <div id="stats" class="hidden"></div>
 
   <div id="parent">
-    <div class="pbar"><div class="tabs" id="ptabs"></div><button id="pClose">닫기</button></div>
+    <div class="pbar"><div class="tabs" id="ptabs"></div><a id="pApps" href="../">앱 선택</a><button id="pClose">닫기</button></div>
     <div class="pbody" id="pbody"></div>
   </div>
   <div id="pin"><div class="box">
