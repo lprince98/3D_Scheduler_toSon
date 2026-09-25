@@ -1,5 +1,5 @@
 /* 오프라인용 서비스워커. 파일을 바꾸면 VERSION을 올릴 것 (그래야 태블릿이 새 파일을 받음) */
-const VERSION = 'dino3d-v0.5';
+const VERSION = 'dino3d-v0.6';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -210,7 +210,10 @@
   #parkBtn { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 4; width: 76px; height: 76px; border-radius: 50%;
     border: none; background: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.12); display: grid; place-items: center; padding: 8px; }
   #parkBtn svg { width: 100%; height: 100%; }
-  body.busy #parkBtn, body.decoOn #parkBtn, body.viewing #parkBtn { display: none; }
+  #appsBtn { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 108px; z-index: 4; width: 76px; height: 76px; border-radius: 50%;
+    background: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.12); display: grid; place-items: center; padding: 14px; }
+  #appsBtn svg { width: 100%; height: 100%; }
+  body.busy #parkBtn, body.decoOn #parkBtn, body.viewing #parkBtn, body.busy #appsBtn, body.decoOn #appsBtn, body.viewing #appsBtn { display: none; }
   #viewBack { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 4; width: 84px; height: 84px; border-radius: 50%;
     border: none; background: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.12); display: none; place-items: center; }
   #viewBack svg { width: 60%; }
@@ -287,6 +290,7 @@
     <div id="dWave"></div>
   </div>
   <button id="parkBtn" aria-label="공룡 공원"></button>
+  <a id="appsBtn" href="../" aria-label="앱 고르기"><svg viewBox="0 0 64 64"><rect x="8" y="8" width="20" height="20" rx="6" fill="#F0913F"/><rect x="36" y="8" width="20" height="20" rx="6" fill="#4FA3E0"/><rect x="8" y="36" width="20" height="20" rx="6" fill="#9B6FD6"/><rect x="36" y="36" width="20" height="20" rx="6" fill="#56B35C"/></svg></a>
   <button id="viewBack" aria-label="돌아가기"></button>
   <div id="deco"></div>
   <div id="pick"><div id="pkCards"></div><button id="pkOk" aria-label="이걸로"></button></div>
@@ -5541,7 +5545,7 @@ function resize() {
   const dist = Math.max(5.3 * fh / (0.63 * freeH), 5.0 * fh / (0.63 * freeW));   // 높이 5.3, 폭 5.0이 빈 공간에 들어오게
   camera.position.set(0, 2.3, dist); camera.lookAt(-0.1, 1.05, 0);
   camera.setViewOffset(fw, fh, offX, offY, W, H); camera.updateProjectionMatrix();
-  const pb = $('parkBtn'); pb.style.right = `${offX + 16}px`;
+  const pb = $('parkBtn'); pb.style.right = `${offX + 16}px`; $('appsBtn').style.right = `${offX + 16 + 76 + 14}px`;
   const bar = $('bar'); bar.style.left = `${freeW / 2}px`; bar.style.bottom = `calc(${offY + 14}px + env(safe-area-inset-bottom))`;
 }
 window.addEventListener('resize', resize);
