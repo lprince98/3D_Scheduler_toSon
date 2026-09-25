@@ -1,6 +1,6 @@
 // 서비스워커 — 오프라인에서도 앱이 열리도록 정적 파일을 캐시한다.
 // 파일을 고쳤으면 아래 VERSION 값을 올려야 태블릿에 새 버전이 내려간다.
-const VERSION = 'tank-v4.1.0';
+const VERSION = 'tank-v4.2.0';
 const FILES = [
   './',
   './index.html',

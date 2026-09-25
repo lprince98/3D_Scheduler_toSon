@@ -208,6 +208,10 @@
   .stat .box { text-align: center; margin: 0; }
   .stat .box b { display: block; font-size: 30px; color: var(--accent); }
   .stat .box span { font-size: 13px; color: #888; }
+  .sbar { display: grid; grid-template-columns: 96px 1fr 56px; gap: 10px; align-items: center; margin: 8px 0; font-size: 15px; }
+  .sbar .tr { height: 12px; border-radius: 999px; background: #eee; overflow: hidden; }
+  .sbar .tr i { display: block; height: 100%; border-radius: 999px; }
+  .sbar span:last-child { text-align: right; color: #777; }
   .days7 { display: flex; gap: 6px; }
   .days7 div { flex: 1; text-align: center; font-size: 13px; color: #777; }
   .days7 .bar { height: 60px; background: #eee; border-radius: 8px; position: relative; overflow: hidden; margin-bottom: 4px; }
@@ -357,6 +361,7 @@
         <div class="box"><b id="stMonth">-</b><span>이번 달</span></div>
       </div>
       <div class="box"><h3>최근 7일</h3><div class="days7" id="days7"></div></div>
+      <div class="box"><h3>과목별 (최근 4주)</h3><div id="subjectBars"></div><p style="font-size:13px;color:#888;margin:6px 0 0">어느 과목이 밀리는지 봅니다.</p></div>
       <div class="box"><h3>몬스터</h3><div id="stMonster" style="font-size:15px;color:#555;line-height:1.7"></div></div>
     </section>
     <section class="tab" id="tab-settings">
@@ -5626,6 +5631,16 @@ function renderStats() {
     el.innerHTML = `<div class="bar"><i style="height:${r.pct || 0}%"></i></div>${DAY_NAMES[(d.getDay() + 6) % 7]}<br>${r.t ? `${r.d}/${r.t}` : '-'}`;
     box.appendChild(el);
   }
+  // 과목별 최근 28일 (완료 / 계획)
+  const per = new Map(); state.settings.subjects.forEach(x => per.set(x.name, { p: 0, d: 0 }));
+  for (let i = 0; i < 28; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    for (const ms of (state.days[dateKey(d)]?.missions || [])) { if (!per.has(ms.subject)) per.set(ms.subject, { p: 0, d: 0 }); const v = per.get(ms.subject); v.p++; if (ms.status === 'done') v.d++; }
+  }
+  $('subjectBars').innerHTML = [...per.entries()].map(([name, v]) => {
+    const t = typeById(subjectType(name));
+    return `<div class="sbar"><span>${t.emoji} ${name}</span><div class="tr"><i style="width:${v.p ? v.d / v.p * 100 : 0}%;background:${t.aura}"></i></div><span>${v.d}/${v.p}</span></div>`;
+  }).join('') || '<p style="font-size:14px;color:#888">아직 기록이 없습니다</p>';
   const m = state.monster;
   $('stMonster').innerHTML = m ? `이름: <b>${m.name}</b> (${typeById(m.type).name} 타입)<br>누적 완료: <b>${m.growth}</b>개 · 진화 단계: ${STAGE_NAMES[m.stage] || m.stage}<br>만든 날: ${m.createdAt.slice(0, 10)}` : '아직 몬스터가 없습니다';
 }

@@ -263,7 +263,7 @@
   .srow { display: grid; grid-template-columns: 1fr 170px 52px; gap: 8px; align-items: center; margin-bottom: 8px; }
   .srow .del, .mrow .del { min-height: 48px; border: 0; border-radius: 10px; background: #f1d9d5; color: #a33; font-size: 20px; font-weight: 700; }
   @media (max-width: 600px) { .mrow { grid-template-columns: 1fr 1fr; } .mrow input { grid-column: 1 / -1; } }
-  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
   .stat { background: #f7f3ea; border-radius: 12px; padding: 12px; text-align: center; }
   .stat b { display: block; font-size: 28px; }
   .stat small { color: var(--muted); }
@@ -271,7 +271,42 @@
   .mbar .track { height: 12px; border-radius: 999px; background: #e6e0d3; overflow: hidden; }
   .mbar .track i { display: block; height: 100%; border-radius: 999px; }
   .hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
-  #file-import { display: none; }
+  /* 몬스터 앱과 같은 부모 화면 구성 */
+  .mini { min-width: 80px; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid #d8d1c2; background: #fff; font-size: 16px; font-weight: 700; color: var(--ink); }
+  .planMode { display: flex; gap: 8px; margin-bottom: 10px; }
+  .planMode button { flex: 1; min-height: 52px; border-radius: 12px; border: 2px solid #d8d1c2; background: #fff; font-size: 17px; font-weight: 800; }
+  .planMode button.on { background: var(--accent); border-color: var(--accent); }
+  .weekNav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .weekNav b { flex: 1; text-align: center; font-size: 17px; }
+  .dayBox.today { outline: 3px solid var(--accent); }
+  .dayBox h3 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .dayBox h3 .cnt { font-size: 13px; color: var(--muted); font-weight: 400; display: flex; align-items: center; gap: 6px; }
+  .dayBox h3 .rev { min-width: 0; min-height: 36px; padding: 0 10px; font-size: 13px; }
+  .drow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid #efeae0; flex-wrap: wrap; }
+  .drow .subj { font-weight: 800; min-width: 96px; font-size: 17px; display: flex; flex-direction: column; gap: 2px; }
+  .drow .subj .badge { align-self: flex-start; font-size: 11px; padding: 1px 8px; }
+  .drow input.note { flex: 1; min-width: 120px; min-height: 48px; font-size: 16px; padding: 4px 10px; border: 2px solid #e5dfd2; border-radius: 10px; }
+  .drow .min { display: flex; align-items: center; gap: 4px; font-size: 15px; }
+  .drow .min button { width: 44px; min-width: 0; min-height: 44px; padding: 0; }
+  .drow .min b { min-width: 44px; text-align: center; }
+  .drow .del { min-width: 48px; width: 48px; padding: 0; color: #c33; border-color: #f0c0c0; }
+  .drow .st { font-size: 13px; color: var(--ok); font-weight: 700; }
+  .addRow { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid #efeae0; }
+  .addRow button { min-height: 48px; padding: 0 14px; border-radius: 10px; border: 2px dashed #cfc7b6; background: #faf8f3; font-size: 15px; font-weight: 700; }
+  .line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 60px; border-bottom: 1px solid #efeae0; font-size: 17px; }
+  .line:last-child { border-bottom: 0; }
+  .line small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+  .line > button { min-width: 88px; min-height: 48px; border-radius: 12px; border: 2px solid #d8d1c2; background: #fff; font-size: 16px; font-weight: 700; }
+  .line > button.danger { border-color: #f09a9a; color: #c33; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button { width: 48px; height: 48px; border-radius: 12px; border: 2px solid #d8d1c2; background: #fff; font-size: 20px; font-weight: 700; }
+  .stepper b { min-width: 44px; text-align: center; font-size: 18px; }
+  .days7 { display: flex; gap: 6px; }
+  .days7 div { flex: 1; text-align: center; font-size: 13px; color: var(--muted); }
+  .days7 .bar { height: 64px; background: #ece6da; border-radius: 8px; position: relative; overflow: hidden; margin-bottom: 4px; }
+  .days7 .bar i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ok); }
+  textarea.json { width: 100%; min-height: 110px; margin-top: 8px; font: 12px/1.4 ui-monospace, Menlo, monospace; border: 2px solid #e5dfd2; border-radius: 10px; padding: 8px; box-sizing: border-box; }
+  #hud.hidden { display: none; }
 
   /* ---------- 확인용 HUD (나중에 제거) ---------- */
   #hud {
@@ -375,7 +410,7 @@
   </div>
 </section>
 
-<!-- 부모 모드 -->
+<!-- 부모 모드 (몬스터 앱과 같은 구성) -->
 <section id="screen-parent" class="screen">
   <div id="parent-head"><h1>부모 모드</h1><button id="btn-parent-close" class="btn">닫기</button></div>
   <div id="parent-tabs">
@@ -386,58 +421,62 @@
   </div>
 
   <div class="ptab on" id="ptab-plan">
-    <div class="pcard">
-      <div class="row-btns" style="align-items:center; justify-content:space-between">
-        <div class="seg" id="week-seg"><button data-w="-1">매주 반복</button><button data-w="0" class="on">이번 주</button><button data-w="1">다음 주</button></div>
-        <button id="btn-copy-prev" class="btn ghost">지난 주 복사</button>
-      </div>
-      <p class="hint" id="week-range"></p>
+    <div class="planMode"><button id="modeTpl">매주 반복</button><button id="modeWeek" class="on">날짜별</button></div>
+    <div class="weekNav" id="weekNavRow"><button class="mini" id="wkPrev">◀</button><b id="wkLabel"></b><button class="mini" id="wkNext">▶</button></div>
+    <div class="pcard" id="weekTools" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="mini" id="copyPrevWeek">지난주 미션 복사</button>
+      <button class="mini" id="revertWeek">반복 일정으로 되돌리기</button>
+      <button class="mini" id="clearWeek">이번 주 비우기</button>
     </div>
-    <div id="day-tabs"></div>
-    <div class="pcard">
-      <div id="plan-rows"></div>
-      <div class="row-btns"><button id="btn-add-mission" class="btn ghost">+ 미션 추가</button><button id="btn-revert-day" class="btn ghost">반복 일정으로 되돌리기</button></div>
-      <p class="hint" id="plan-hint"></p>
-    </div>
+    <div id="weekDays"></div>
+    <p class="hint" id="planHint"></p>
   </div>
 
   <div class="ptab" id="ptab-stats">
-    <div class="pcard"><h3>달성률</h3><div class="stat-grid" id="stat-grid"></div></div>
-    <div class="pcard"><h3>모듈별 균형 (최근 4주)</h3><div id="module-bars"></div>
-      <p class="hint">어느 과목이 밀리는지 봅니다. 회색 임시 부품 수도 함께 표시.</p></div>
-    <div class="pcard"><h3>최근 2주</h3><div id="recent-days"></div></div>
+    <div class="stat-grid">
+      <div class="stat"><small>오늘</small><b id="stDay">-</b><small id="stDayN"></small></div>
+      <div class="stat"><small>이번 주</small><b id="stWeek">-</b><small id="stWeekN"></small></div>
+      <div class="stat"><small>이번 달</small><b id="stMonth">-</b><small id="stMonthN"></small></div>
+    </div>
+    <div class="pcard"><h3>최근 7일</h3><div class="days7" id="days7"></div></div>
+    <div class="pcard"><h3>과목별 (최근 4주)</h3><div id="subjectBars"></div>
+      <p class="hint">어느 과목이 밀리는지 봅니다. 괄호 안은 연결된 전차 부위와 그 부위의 회색 임시 부품 수.</p></div>
+    <div class="pcard"><h3>전차</h3><div id="stTank" style="font-size:15px;color:#555;line-height:1.7"></div></div>
   </div>
 
   <div class="ptab" id="ptab-settings">
     <div class="pcard"><h3>과목</h3>
       <div id="subject-rows"></div>
-      <div class="row-btns"><button id="btn-add-subject" class="btn ghost">+ 과목 추가</button></div>
-      <p class="hint">과목마다 전차의 어느 부위(모듈)와 연결할지 고릅니다. 그 과목 숙제를 하면 그 부위 부품이 제 색으로 붙어요. 이름을 바꾸면 등록된 미션에도 함께 바뀝니다.</p></div>
-    <div class="pcard"><h3>다음 단계 해금 기준 (주간 달성률)</h3><div class="seg" id="set-unlock"></div></div>
-    <div class="pcard"><h3>타이머 기본값</h3><div class="seg" id="set-minutes"></div></div>
-    <div class="pcard"><h3>3D 품질</h3><div class="seg" id="set-quality"></div>
-      <p class="hint">낮음: 픽셀비율 1.0, 안티앨리어싱 끔. 태블릿이 뜨거워지면 낮음으로.</p></div>
-    <div class="pcard"><h3>비밀번호</h3><div class="row-btns"><button id="btn-pin-change" class="btn ghost">비밀번호 바꾸기</button></div></div>
+      <div class="addRow"><button id="btn-add-subject">+ 과목 추가</button></div>
+      <p class="hint">과목마다 전차의 어느 부위(모듈)와 연결할지 고릅니다. 그 과목 숙제를 하면 그 부위 부품이 제 색으로 붙어요. 이름을 바꾸면 등록된 미션도 함께 바뀝니다.</p></div>
+    <div class="pcard">
+      <div class="line"><span>단계 해금 기준 (%) <small>주간 달성률</small></span><div class="stepper"><button id="ulMinus">−</button><b id="ulVal">80</b><button id="ulPlus">+</button></div></div>
+      <div class="line"><span>타이머 기본 (분) <small>새로 넣는 미션의 시간</small></span><div class="stepper"><button id="tmMinus">−</button><b id="tmVal">20</b><button id="tmPlus">+</button></div></div>
+      <div class="line"><span>효과음</span><button id="soundToggle">켜짐</button></div>
+      <div class="line"><span>3D 품질 <small>낮음 권장 (발열)</small></span><button id="qualityBtn">낮음</button></div>
+      <div class="line"><span>성능 표시 <small>왼쪽 아래 fps·삼각형 수</small></span><button id="statsToggle">켜짐</button></div>
+      <div class="line"><span>비밀번호 바꾸기</span><button id="btn-pin-change">변경</button></div>
+    </div>
+    <div class="pcard"><h3>테스트·초기화</h3>
+      <div class="line"><span>오늘 미션 다시 만들기 <small>등록한 일정으로 새로 (완료분은 유지)</small></span><button id="resetToday">초기화</button></div>
+      <div class="line"><span>이번 주 달성 처리 <small>다음 단계로 (4주차면 완성 연출)</small></span><button id="btn-test-unlock">다음 단계</button></div>
+      <div class="line"><span>현재 단계 부품 전부 결합</span><button id="btn-test-fill">결합</button></div>
+      <div class="line"><span>모든 데이터 지우기 <small>비밀번호는 유지</small></span><button class="danger" id="btn-reset">지우기</button></div>
+    </div>
   </div>
 
   <div class="ptab" id="ptab-data">
-    <div class="pcard"><h3>내보내기 / 가져오기</h3>
-      <div class="row-btns">
-        <button id="btn-export" class="btn">JSON 내보내기</button>
-        <button id="btn-import" class="btn ghost">JSON 가져오기</button>
-        <input id="file-import" type="file" accept="application/json,.json">
-      </div>
-      <p class="hint">기기를 옮길 때: 이 기기에서 내보내기 → 파일을 새 기기로 옮김 → 새 기기에서 가져오기. 가져오면 현재 데이터를 덮어씁니다.</p>
+    <div class="pcard"><h3>내보내기</h3>
+      <p class="hint" style="margin:0 0 8px">기기를 옮기거나 백업할 때. 파일로 저장하거나 아래 글자를 복사하세요.</p>
+      <div class="row-btns"><button class="mini" id="btn-export">파일로 저장 (.json)</button><button class="mini" id="btn-export-show">글자로 보기</button></div>
+      <textarea class="json" id="exportText" readonly style="display:none"></textarea>
     </div>
-    <div class="pcard"><h3>테스트용</h3>
-      <div class="row-btns">
-        <button id="btn-test-unlock" class="btn ghost">이번 주 달성 처리 → 다음 단계</button>
-        <button id="btn-test-fill" class="btn ghost">현재 단계 부품 전부 결합</button>
-      </div>
-      <p class="hint">흐름 확인용. 4단계에서 "달성 처리"하면 완성 연출이 나옵니다.</p></div>
-    <div class="pcard"><h3>초기화</h3>
-      <div class="row-btns"><button id="btn-reset" class="btn ghost">모든 진행 지우기</button></div>
-      <p class="hint">전차·부품·미션 기록·설정이 모두 지워집니다.</p></div>
+    <div class="pcard"><h3>가져오기</h3>
+      <p class="hint" style="margin:0 0 8px">지금 데이터를 덮어씁니다.</p>
+      <input type="file" id="file-import" accept=".json,application/json" style="font-size:15px;min-height:44px">
+      <textarea class="json" id="importText" placeholder="또는 여기에 붙여넣기"></textarea>
+      <button class="mini" id="btn-import" style="margin-top:8px">가져오기</button>
+    </div>
   </div>
 </section>
 
@@ -571,7 +610,9 @@ function weekKey(d = new Date()) {   // 그 주 월요일 날짜
   const m = new Date(d); const day = (m.getDay() + 6) % 7; m.setDate(m.getDate() - day); return todayKey(m);
 }
 const defaultSubjects = () => Object.entries(DEFAULT_SUBJECTS).map(([name, module]) => ({ name, module }));
-const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', pin: null, subjects: defaultSubjects() });
+const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', sound: true, showStats: true, pin: null, subjects: defaultSubjects() });
+// 비밀번호는 해시로 저장 (아이가 저장값을 봐도 모르게 하는 용도, 보안용 아님). 몬스터 앱과 같은 방식
+function hashPin(p) { let h = 5381; for (const c of p + '|tank') h = ((h << 5) + h + c.charCodeAt(0)) | 0; return 'h:' + (h >>> 0); }
 // 과목 → 모듈 (부모가 정한 과목 목록 기준, 지운 과목은 승무원 장비로)
 const modOf = name => ((state.settings.subjects || []).find(x => x.name === name) || {}).module || 'misc';
 const defaultState = () => ({
@@ -611,6 +652,7 @@ function migrate(s) {
   s.decor = Object.assign(defaultDecor(), s.decor || {}); s.garage = s.garage || [];
   s.settings = Object.assign(defaultSettings(), s.settings || {}); delete s.settings.missionsPerDay;
   if (!Array.isArray(s.settings.subjects) || !s.settings.subjects.length) s.settings.subjects = defaultSubjects();
+  if (s.settings.pin && !String(s.settings.pin).startsWith('h:')) s.settings.pin = hashPin(String(s.settings.pin));   // 예전 평문 비밀번호 → 해시
   s.history = s.history || {}; s.plan = s.plan || {};
   return s;
 }
@@ -629,7 +671,7 @@ function specFor(dateKey) {
 function ensureToday() {
   const t = todayKey();
   if (state.missions.date !== t) {
-    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, title, minutes, status }) => ({ subject, title, minutes, status }));
+    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, note, title, minutes, status }) => ({ subject, note: note || '', title, minutes, status }));
     state.missions = { date: t, items: [] };
     rebuildToday();
   }
@@ -864,6 +906,7 @@ function loop(now) {
   if (now - fpsTime >= 1000) {
     const i = renderer.info.render;
     hud.textContent = `tris ${i.triangles} calls ${i.calls} fps ${frames} pr ${renderer.getPixelRatio().toFixed(2)}`;
+    hud.classList.toggle('hidden', state.settings.showStats === false);
     frames = 0; fpsTime = now;
   }
 }
@@ -883,7 +926,7 @@ const sfx = (() => {
     } catch { ac = null; }
   }
   ['pointerdown', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, unlock, { passive: true }));
-  const ready = () => !!ac && ac.state === 'running';
+  const ready = () => !!ac && ac.state === 'running' && state.settings.sound !== false;   // 설정에서 끄면 소리 없음 (진동은 유지)
   function tone(freq, dur, type = 'sine', gain = 0.25, t0 = 0, slideTo = null) {
     const t = ac.currentTime + t0, o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t);
@@ -1116,7 +1159,7 @@ function leaveFocus() {
 }
 function renderDurations(m) {
   const box = $('#focus-durations'); box.innerHTML = '';
-  for (const d of DURATIONS) {
+  for (const d of [...new Set([...DURATIONS, m.minutes])].sort((x, y) => x - y)) {   // 부모가 정한 시간도 선택지에
     const b = document.createElement('button');
     b.textContent = `${d}분`; b.classList.toggle('on', m.minutes === d);
     b.addEventListener('click', () => { m.minutes = d; save(); renderDurations(m); tickFocus(); });
@@ -1380,215 +1423,230 @@ function pinKey(k) {
   if (pinBuf.length < 6) return;
   const v = pinBuf; pinBuf = '';
   if (pinMode === 'check') {
-    if (v === state.settings.pin) { const f = pinDone; pinDone = null; f && f(); }
+    if (hashPin(v) === state.settings.pin) { const f = pinDone; pinDone = null; f && f(); }
     else { $('#pin-msg').textContent = '비밀번호가 달라요'; sfx.tick(); setTimeout(renderPin, 150); }
   } else if (!pinFirst) {
     pinFirst = v; $('#pin-title').textContent = '한 번 더 입력'; $('#pin-msg').textContent = ''; setTimeout(renderPin, 150);
   } else if (v === pinFirst) {
-    state.settings.pin = v; save(); const f = pinDone; pinDone = null; f && f();
+    state.settings.pin = hashPin(v); save(); const f = pinDone; pinDone = null; f && f();
   } else {
     pinFirst = ''; $('#pin-title').textContent = '새 비밀번호 6자리'; $('#pin-msg').textContent = '두 번 입력이 달라요. 다시'; setTimeout(renderPin, 150);
   }
 }
 $('#pin-cancel').addEventListener('click', () => { pinDone = null; show(pinBack); });
 
-// ---- 부모 화면 ----
-let planWeekOffset = 0, planDay = 0;
+// ---- 부모 화면 (몬스터 앱과 같은 구성) ----
+let weekOffset = 0, planTpl = false;             // planTpl: '매주 반복' 편집 중
+const hasAnyPlan = () => Object.keys(state.template).some(k => state.template[k].length) || Object.keys(state.plan).length > 0;
+const fmtMD = k => { const [, m, d] = k.split('-'); return `${+m}/${+d}`; };
 function enterParent() {
   pinBack = 'garage';
-  const hasAny = Object.keys(state.template).some(k => state.template[k].length) || Object.keys(state.plan).length;
-  planWeekOffset = hasAny ? 0 : -1; planDay = hasAny ? dow(new Date()) : 0;   // 처음이면 '매주 반복'부터
-  renderPlan(); renderStats(); renderSettings();
-  show('parent');
+  weekOffset = 0; planTpl = !hasAnyPlan();         // 처음이면 '매주 반복'부터
+  showPTab('plan'); show('parent');
+}
+function showPTab(name) {
+  $('#parent-tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
+  document.querySelectorAll('.ptab').forEach(x => x.classList.toggle('on', x.id === 'ptab-' + name));
+  if (name === 'plan') renderPlan(); if (name === 'stats') renderStats(); if (name === 'settings') renderSettings();
 }
 $('#btn-parent-close').addEventListener('click', () => { if (state.tank) enterGarage(); else { renderSelect(); show('select'); } });
-$('#parent-tabs').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  $('#parent-tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-  document.querySelectorAll('.ptab').forEach(x => x.classList.toggle('on', x.id === 'ptab-' + b.dataset.tab));
-  if (b.dataset.tab === 'stats') renderStats();
-});
+$('#parent-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showPTab(b.dataset.tab); });
 
-// ---- 미션 등록 ----
-// planWeekOffset: -1 = 매주 반복 일정, 0 = 이번 주, 1 = 다음 주
-const isTemplate = () => planWeekOffset < 0;
-const planWeek = () => addDays(weekKey(), Math.max(0, planWeekOffset) * 7);
-const dayOverride = (wk, i) => state.plan[wk] && state.plan[wk][i];
-// 편집할 목록. 주 단위 편집은 처음 손대는 순간 반복 일정을 복사해 '이번 주만' 목록을 만든다
-function planDayList(create) {
-  if (isTemplate()) { if (!state.template[planDay]) { if (!create) return null; state.template[planDay] = []; } return state.template[planDay]; }
-  const wk = planWeek();
-  if (!dayOverride(wk, planDay)) {
-    if (!create) return null;
-    state.plan[wk] = state.plan[wk] || {};
-    state.plan[wk][planDay] = (state.template[planDay] || []).map(x => ({ ...x }));
-  }
-  return state.plan[wk][planDay];
+// ---- 미션 등록: 매주 반복 / 날짜별(한 주 7일을 한 화면에) ----
+const weekDates = off => { const wk = addDays(weekKey(), off * 7); return Array.from({ length: 7 }, (_, i) => addDays(wk, i)); };
+function ensureDayPlan(k) {                        // 그 날짜만의 목록 (처음 손대면 반복 일정을 복사)
+  const wk = weekKey(new Date(k + 'T00:00:00')), i = dow(new Date(k + 'T00:00:00'));
+  state.plan[wk] = state.plan[wk] || {};
+  if (!state.plan[wk][i]) state.plan[wk][i] = (state.template[i] || []).map(x => ({ ...x }));
+  return state.plan[wk][i];
 }
-function afterPlanChange() { rebuildToday(); save(); renderPlan(); }   // 오늘 미션에 바로 반영 (진행 중·완료 항목은 유지)
-function subjectOptions(sel, current) {
-  const names = state.settings.subjects.map(x => x.name);
-  if (current && !names.includes(current)) names.push(current);          // 지운 과목도 기존 미션에서는 보이게
-  names.forEach(n => { const o = new Option(n, n); o.selected = n === current; sel.add(o); });
+const dayOwn = k => { const d = new Date(k + 'T00:00:00'); const p = state.plan[weekKey(d)]; return !!(p && p[dow(d)]); };
+function dropDayPlan(k) {
+  const d = new Date(k + 'T00:00:00'), wk = weekKey(d);
+  if (state.plan[wk]) { delete state.plan[wk][dow(d)]; if (!Object.keys(state.plan[wk]).length) delete state.plan[wk]; }
+}
+function planChanged() { rebuildToday(); save(); }  // 오늘 미션에 바로 반영 (진행 중·완료 항목은 유지)
+const retitle = m => { m.title = m.note ? `${m.subject} · ${m.note}` : `${m.subject} 숙제`; };
+function dayBox({ title, cnt, today, list, getList, doneOf, revert }) {
+  const box = document.createElement('div'); box.className = 'pcard dayBox' + (today ? ' today' : '');
+  box.innerHTML = `<h3><span>${title}</span><span class="cnt">${cnt}</span></h3>`;
+  if (revert) { const r = document.createElement('button'); r.className = 'mini rev'; r.textContent = '반복으로'; r.addEventListener('click', revert); box.querySelector('.cnt').appendChild(r); }
+  list.forEach((p, i) => {
+    const row = document.createElement('div'); row.className = 'drow';
+    const mod = MODULES[modOf(p.subject)];
+    row.innerHTML = `<span class="subj">${p.subject}<span class="badge ${mod.cls}">${mod.name}</span></span>`;
+    const note = document.createElement('input'); note.className = 'note'; note.placeholder = '분량 (예: 3단원 2쪽)'; note.value = p.note || ''; note.maxLength = 20;
+    note.addEventListener('change', () => { const q = getList()[i]; q.note = note.value.trim(); retitle(q); planChanged(); });
+    const min = document.createElement('div'); min.className = 'min';
+    const mm = document.createElement('button'); mm.className = 'mini'; mm.textContent = '−';
+    const mv = document.createElement('b'); mv.textContent = `${p.minutes}분`;
+    const mp = document.createElement('button'); mp.className = 'mini'; mp.textContent = '+';
+    mm.addEventListener('click', () => { const q = getList()[i]; q.minutes = Math.max(5, q.minutes - 5); mv.textContent = `${q.minutes}분`; planChanged(); });
+    mp.addEventListener('click', () => { const q = getList()[i]; q.minutes = Math.min(60, q.minutes + 5); mv.textContent = `${q.minutes}분`; planChanged(); });
+    min.append(mm, mv, mp);
+    row.append(note, min);
+    if (doneOf(p)) { const st = document.createElement('span'); st.className = 'st'; st.textContent = '완료 ✓'; row.append(st); }
+    else { const del = document.createElement('button'); del.className = 'mini del'; del.textContent = '✕'; del.addEventListener('click', () => { getList().splice(i, 1); planChanged(); renderPlan(); }); row.append(del); }
+    box.appendChild(row);
+  });
+  const add = document.createElement('div'); add.className = 'addRow';
+  for (const sbj of state.settings.subjects) {
+    const b = document.createElement('button'); b.textContent = `+ ${sbj.name}`;
+    b.addEventListener('click', () => {
+      const l = getList(); if (l.length >= 5) { alert('하루 최대 5개입니다'); return; }
+      l.push({ subject: sbj.name, note: '', title: `${sbj.name} 숙제`, minutes: state.settings.defaultMinutes }); planChanged(); renderPlan();
+    });
+    add.appendChild(b);
+  }
+  box.appendChild(add);
+  return box;
 }
 function renderPlan() {
-  const wk = planWeek(), tpl = isTemplate();
-  $('#week-seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.w === planWeekOffset));
-  $('#week-range').textContent = tpl ? '여기서 정한 요일별 미션이 매주 자동으로 반복됩니다.'
-    : `${wk.slice(5).replace('-', '/')} (월) ~ ${addDays(wk, 6).slice(5).replace('-', '/')} (일) · 여기서 고친 요일은 이 주에만 적용`;
-  $('#btn-copy-prev').style.display = tpl ? 'none' : '';
-  const tabs = $('#day-tabs'); tabs.innerHTML = '';
-  for (let i = 0; i < 7; i++) {
-    const b = document.createElement('button');
-    const own = !tpl && dayOverride(wk, i);
-    const n = tpl ? (state.template[i] || []).length : specFor(addDays(wk, i)).length;
-    b.innerHTML = `${DOW_NAMES[i]}<small>${n}개${tpl ? '' : own ? ' ·이 주만' : ''}</small>`;
-    b.classList.toggle('on', i === planDay);
-    b.addEventListener('click', () => { planDay = i; renderPlan(); });
-    tabs.appendChild(b);
+  $('#modeTpl').classList.toggle('on', planTpl); $('#modeWeek').classList.toggle('on', !planTpl);
+  $('#weekNavRow').style.display = planTpl ? 'none' : ''; $('#weekTools').style.display = planTpl ? 'none' : 'flex';
+  const wrap = $('#weekDays'); wrap.innerHTML = '';
+  const today = todayKey();
+  if (planTpl) {
+    $('#planHint').textContent = '여기서 정한 요일별 미션이 매주 자동으로 나옵니다. 비워 둔 요일은 쉬는 날. 특정 날짜만 바꾸려면 "날짜별"에서 고치세요. (하루 최대 5개)';
+    DOW_NAMES.forEach((name, di) => {
+      const list = state.template[di] || [];
+      wrap.appendChild(dayBox({ title: `${name}요일`, cnt: `${list.length}개`, today: di === dow(new Date()), list,
+        getList: () => (state.template[di] = state.template[di] || []), doneOf: () => false }));
+    });
+    return;
   }
-  const rows = $('#plan-rows'); rows.innerHTML = '';
-  const list = planDayList(false) || (tpl ? [] : specFor(addDays(wk, planDay)));
-  const own = !tpl && !!dayOverride(wk, planDay);
-  list.forEach((m, idx) => {
-    const r = document.createElement('div'); r.className = 'mrow';
-    const subj = document.createElement('select');
-    subjectOptions(subj, m.subject);
-    const title = document.createElement('input'); title.type = 'text'; title.placeholder = '분량 (예: 문제집 12~13쪽)'; title.value = m.note || '';
-    const mins = document.createElement('select');
-    DURATIONS.forEach(d => { const o = new Option(`${d}분`, d); o.selected = d === m.minutes; mins.add(o); });
-    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×';
-    const commit = () => {
-      const l = planDayList(true); const it = l[idx];
-      it.subject = subj.value; it.minutes = +mins.value;
-      it.note = title.value.trim(); it.title = it.note ? `${subj.value} · ${it.note}` : `${subj.value} 숙제`;
-      afterPlanChange();
-    };
-    subj.addEventListener('change', commit); mins.addEventListener('change', commit); title.addEventListener('change', commit);
-    del.addEventListener('click', () => { planDayList(true).splice(idx, 1); afterPlanChange(); });
-    r.append(subj, title, mins, del); rows.appendChild(r);
+  const wk = weekDates(weekOffset);
+  $('#wkLabel').textContent = `${fmtMD(wk[0])} ~ ${fmtMD(wk[6])}${weekOffset === 0 ? ' (이번 주)' : weekOffset === 1 ? ' (다음 주)' : weekOffset === -1 ? ' (지난주)' : ''}`;
+  $('#planHint').textContent = '"반복" 표시된 날은 매주 반복 일정이 그대로 나오는 날입니다. 여기서 고치면 그 날짜에만 적용되고("이 날만"), 반복 일정은 바뀌지 않습니다. 이미 완료한 미션은 지워지지 않습니다.';
+  wk.forEach((k, di) => {
+    const own = dayOwn(k), list = specFor(k), items = itemsOn(k);
+    const doneN = items.filter(m => m.status === 'done').length;
+    wrap.appendChild(dayBox({
+      title: `${DOW_NAMES[di]} ${fmtMD(k)}${k === today ? ' · 오늘' : ''}`,
+      cnt: `${own ? '이 날만' : '반복'} · ${list.length}개${doneN ? ` · 완료 ${doneN}` : ''}`,
+      today: k === today, list,
+      getList: () => ensureDayPlan(k),
+      doneOf: p => items.some(m => m.status === 'done' && m.subject === p.subject && (m.note || '') === (p.note || '')),
+      revert: own ? () => { dropDayPlan(k); planChanged(); renderPlan(); } : null,
+    }));
   });
-  if (!list.length) rows.innerHTML = '<p class="hint">이 날은 미션이 없습니다. (쉬는 날)</p>';
-  $('#btn-revert-day').style.display = own ? '' : 'none';
-  $('#plan-hint').textContent = tpl ? '예: 월요일에 수학·영어·구몬을 넣어두면 매주 월요일마다 그 3개가 나옵니다. 하루 최대 5개.'
-    : own ? '이 요일은 이 주에만 따로 정한 목록입니다. "반복 일정으로 되돌리기"를 누르면 매주 반복 일정으로 돌아갑니다.'
-    : '지금은 매주 반복 일정이 보이는 중입니다. 여기서 고치면 이 주에만 적용되고, 반복 일정은 그대로입니다.';
 }
-$('#week-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; planWeekOffset = +b.dataset.w; renderPlan(); });
-$('#btn-add-mission').addEventListener('click', () => {
-  const l = planDayList(true);
-  if (l.length >= 5) { alert('하루 최대 5개입니다.'); return; }
-  const first = state.settings.subjects[0] ? state.settings.subjects[0].name : '기타';
-  l.push({ subject: first, note: '', title: `${first} 숙제`, minutes: state.settings.defaultMinutes }); afterPlanChange();
+$('#modeTpl').addEventListener('click', () => { planTpl = true; renderPlan(); });
+$('#modeWeek').addEventListener('click', () => { planTpl = false; renderPlan(); });
+$('#wkPrev').addEventListener('click', () => { weekOffset--; renderPlan(); });
+$('#wkNext').addEventListener('click', () => { weekOffset++; renderPlan(); });
+$('#copyPrevWeek').addEventListener('click', () => {
+  const cur = weekDates(weekOffset), prev = weekDates(weekOffset - 1);
+  const wk = weekKey(new Date(cur[0] + 'T00:00:00'));
+  state.plan[wk] = {}; cur.forEach((k, i) => { state.plan[wk][i] = specFor(prev[i]).map(x => ({ subject: x.subject, note: x.note || '', title: x.title, minutes: x.minutes })); });
+  planChanged(); renderPlan();
 });
-$('#btn-revert-day').addEventListener('click', () => {
-  const wk = planWeek(); if (!dayOverride(wk, planDay)) return;
-  if (!confirm(`${DOW_NAMES[planDay]}요일을 매주 반복 일정으로 되돌릴까요?`)) return;
-  delete state.plan[wk][planDay]; if (!Object.keys(state.plan[wk]).length) delete state.plan[wk];
-  afterPlanChange();
+$('#revertWeek').addEventListener('click', () => {
+  if (!confirm('이 주를 매주 반복 일정으로 되돌릴까요? (날짜별로 고친 것이 지워집니다. 완료한 미션은 남습니다)')) return;
+  weekDates(weekOffset).forEach(dropDayPlan); planChanged(); renderPlan();
 });
-$('#btn-copy-prev').addEventListener('click', () => {
-  const src = addDays(planWeek(), -7);
-  const from = state.plan[src];
-  if (!from) { alert('지난 주에 따로 고친 요일이 없습니다. (반복 일정은 이미 매주 나옵니다)'); return; }
-  if (state.plan[planWeek()] && !confirm('이 주에 등록된 미션을 지난 주 것으로 덮어쓸까요?')) return;
-  state.plan[planWeek()] = JSON.parse(JSON.stringify(from)); afterPlanChange();
+$('#clearWeek').addEventListener('click', () => {
+  if (!confirm('이 주 미션을 모두 비울까요? (완료한 미션은 남습니다)')) return;
+  const cur = weekDates(weekOffset), wk = weekKey(new Date(cur[0] + 'T00:00:00'));
+  state.plan[wk] = {}; for (let i = 0; i < 7; i++) state.plan[wk][i] = [];
+  planChanged(); renderPlan();
 });
 
 // ---- 달성률 ----
+function rateOf(keys) {
+  let d = 0, t = 0;
+  for (const k of keys) { const it = itemsOn(k); t += it.length; d += it.filter(m => m.status === 'done').length; }
+  return { d, t, pct: t ? Math.round(d / t * 100) + '%' : '-' };
+}
 function renderStats() {
-  const t = todayKey(); const today = itemsOn(t);
-  const ws = weekStats();
-  let mp = 0, md = 0;
-  for (let i = 0; i < 31; i++) { const k = addDays(t, -i); if (k.slice(0, 7) !== t.slice(0, 7)) break; const it = itemsOn(k); mp += it.length; md += it.filter(m => m.status === 'done').length; }
-  const pct = (d, p) => p ? Math.round(d / p * 100) + '%' : '–';
-  $('#stat-grid').innerHTML = [
-    ['오늘', today.filter(m => m.status === 'done').length, today.length],
-    ['이번 주', ws.done, ws.planned], ['이번 달', md, mp],
-  ].map(([n, d, p]) => `<div class="stat"><small>${n}</small><b>${pct(d, p)}</b><small>${d} / ${p}</small></div>`).join('');
-  // 모듈별: 최근 28일
-  const per = {}; for (const k in MODULES) per[k] = { p: 0, d: 0 };
-  for (let i = 0; i < 28; i++) for (const m of itemsOn(addDays(t, -i))) { const mod = modOf(m.subject); per[mod].p++; if (m.status === 'done') per[mod].d++; }
-  const greyByMod = {}; for (const a of state.attached) if (!a.ok) { const p = parts().find(x => x.id === a.id); greyByMod[p.module] = (greyByMod[p.module] || 0) + 1; }
-  $('#module-bars').innerHTML = Object.entries(MODULES).map(([k, v]) => {
-    const { p, d } = per[k]; const w = p ? d / p * 100 : 0;
-    return `<div class="mbar"><span class="badge ${v.cls}">${v.name}</span><div class="track"><i style="width:${w}%;background:var(--c-${k})"></i></div><span>${d}/${p}${greyByMod[k] ? ` · 회색 ${greyByMod[k]}` : ''}</span></div>`;
-  }).join('');
-  $('#recent-days').innerHTML = Array.from({ length: 14 }, (_, i) => addDays(t, -i)).map(k => {
-    const it = itemsOn(k); if (!it.length) return '';
-    const d = new Date(k + 'T00:00:00');
-    return `<div class="mbar"><span>${k.slice(5).replace('-', '/')} (${DOW_NAMES[dow(d)]})</span><div class="track"><i style="width:${it.filter(m => m.status === 'done').length / it.length * 100}%;background:var(--ok)"></i></div><span>${it.filter(m => m.status === 'done').length}/${it.length}</span></div>`;
+  const t = todayKey();
+  const put = (id, r) => { $('#' + id).textContent = r.pct; $('#' + id + 'N').textContent = r.t ? `${r.d} / ${r.t}` : ''; };
+  put('stDay', rateOf([t]));
+  const ws = weekStats(); $('#stWeek').textContent = ws.planned ? Math.round(ws.done / ws.planned * 100) + '%' : '-'; $('#stWeekN').textContent = ws.planned ? `${ws.done} / ${ws.planned}` : '';
+  const monthKeys = []; for (let i = 0; i < 31; i++) { const k = addDays(t, -i); if (k.slice(0, 7) !== t.slice(0, 7)) break; monthKeys.push(k); }
+  put('stMonth', rateOf(monthKeys));
+  const box = $('#days7'); box.innerHTML = '';
+  for (let i = 6; i >= 0; i--) {
+    const k = addDays(t, -i), r = rateOf([k]);
+    const el = document.createElement('div');
+    el.innerHTML = `<div class="bar"><i style="height:${r.t ? r.d / r.t * 100 : 0}%"></i></div>${DOW_NAMES[dow(new Date(k + 'T00:00:00'))]}<br>${r.t ? `${r.d}/${r.t}` : '-'}`;
+    box.appendChild(el);
+  }
+  // 과목별 최근 28일
+  const per = new Map(); state.settings.subjects.forEach(x => per.set(x.name, { p: 0, d: 0 }));
+  for (let i = 0; i < 28; i++) for (const m of itemsOn(addDays(t, -i))) { if (!per.has(m.subject)) per.set(m.subject, { p: 0, d: 0 }); const v = per.get(m.subject); v.p++; if (m.status === 'done') v.d++; }
+  const greyBy = {}; for (const a of state.attached) if (!a.ok) { const p = parts().find(x => x.id === a.id); if (p) greyBy[p.module] = (greyBy[p.module] || 0) + 1; }
+  $('#subjectBars').innerHTML = [...per.entries()].map(([name, { p, d }]) => {
+    const mk = modOf(name), mod = MODULES[mk];
+    return `<div class="mbar"><span>${name}</span><div class="track"><i style="width:${p ? d / p * 100 : 0}%;background:var(--c-${mk})"></i></div><span>${d}/${p}</span></div>
+      <div class="hint" style="margin:-4px 0 6px 120px">(${mod.name}${greyBy[mk] ? ` · 회색 ${greyBy[mk]}개` : ''})</div>`;
   }).join('') || '<p class="hint">아직 기록이 없습니다.</p>';
+  const tk = TANKS.find(x => x.id === state.tank);
+  const grey = state.attached.filter(a => !a.ok).length;
+  $('#stTank').innerHTML = tk
+    ? `전차: <b>${tk.name}</b> (${tk.country})<br>단계: ${state.build.stage}주차 · ${STAGE_NAMES[state.build.stage]}<br>부품: <b>${state.attached.length}</b> / ${parts().length}${grey ? ` · 회색 ${grey}개` : ''}<br>완성한 전차: ${state.garage.length}대`
+    : `아직 고른 전차가 없습니다<br>완성한 전차: ${state.garage.length}대`;
 }
 
 // ---- 설정 ----
-function seg(el, options, current, onPick) {
-  el.innerHTML = '';
-  for (const [label, val] of options) {
-    const b = document.createElement('button'); b.textContent = label; b.classList.toggle('on', val === current);
-    b.addEventListener('click', () => { onPick(val); save(); renderSettings(); }); el.appendChild(b);
-  }
-}
 function renderSettings() {
   const st = state.settings;
+  $('#ulVal').textContent = Math.round(st.unlockRatio * 100);
+  $('#tmVal').textContent = st.defaultMinutes;
+  $('#soundToggle').textContent = st.sound !== false ? '켜짐' : '꺼짐';
+  $('#qualityBtn').textContent = st.quality === 'high' ? '높음' : '낮음';
+  $('#statsToggle').textContent = st.showStats !== false ? '켜짐' : '꺼짐';
+  hud.classList.toggle('hidden', st.showStats === false);
   renderSubjects();
-  seg($('#set-unlock'), [0.6,0.7,0.8,0.9,1].map(r => [`${Math.round(r*100)}%`, r]), st.unlockRatio, v => { st.unlockRatio = v; });
-  seg($('#set-minutes'), DURATIONS.map(d => [`${d}분`, d]), st.defaultMinutes, v => { st.defaultMinutes = v; });
-  seg($('#set-quality'), [['낮음', 'low'], ['높음', 'high']], st.quality, v => { if (st.quality !== v) { st.quality = v; applyQuality(); } });
 }
+const stepper = (id, fn) => $('#' + id).addEventListener('click', () => { fn(state.settings); save(); renderSettings(); });
+stepper('ulMinus', st => { st.unlockRatio = Math.max(0.5, Math.round(st.unlockRatio * 10 - 1) / 10); });
+stepper('ulPlus',  st => { st.unlockRatio = Math.min(1, Math.round(st.unlockRatio * 10 + 1) / 10); });
+stepper('tmMinus', st => { st.defaultMinutes = Math.max(5, st.defaultMinutes - 5); });
+stepper('tmPlus',  st => { st.defaultMinutes = Math.min(60, st.defaultMinutes + 5); });
+$('#soundToggle').addEventListener('click', () => { state.settings.sound = state.settings.sound === false; save(); renderSettings(); if (state.settings.sound) sfx.tick(); });
+$('#qualityBtn').addEventListener('click', () => { state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; save(); applyQuality(); renderSettings(); });
+$('#statsToggle').addEventListener('click', () => { state.settings.showStats = state.settings.showStats === false; save(); renderSettings(); });
 function renameSubjectEverywhere(from, to) {
-  const fix = arr => (arr || []).forEach(m => { if (m.subject === from) { m.subject = to; m.title = m.note ? `${to} · ${m.note}` : `${to} 숙제`; } });
+  const fix = arr => (arr || []).forEach(m => { if (m.subject === from) { m.subject = to; retitle(m); } });
   for (const k in state.template) fix(state.template[k]);
   for (const wk in state.plan) for (const d in state.plan[wk]) fix(state.plan[wk][d]);
+  for (const k in state.history) fix(state.history[k]);
   fix(state.missions.items);
 }
 function renderSubjects() {
   const box = $('#subject-rows'); box.innerHTML = '';
   state.settings.subjects.forEach((sub, idx) => {
     const r = document.createElement('div'); r.className = 'srow';
-    const name = document.createElement('input'); name.type = 'text'; name.value = sub.name; name.maxLength = 12;
+    const name = document.createElement('input'); name.type = 'text'; name.value = sub.name; name.maxLength = 10;
     const mod = document.createElement('select');
     Object.entries(MODULES).forEach(([k, v]) => { const o = new Option(v.name, k); o.selected = k === sub.module; mod.add(o); });
-    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×';
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
     name.addEventListener('change', () => {
       const v = name.value.trim();
       if (!v) { name.value = sub.name; return; }
-      if (state.settings.subjects.some((x, j) => j !== idx && x.name === v)) { alert('같은 이름의 과목이 있습니다.'); name.value = sub.name; return; }
-      renameSubjectEverywhere(sub.name, v); sub.name = v; rebuildToday(); save(); renderSubjects(); renderPlan();
+      if (state.settings.subjects.some((x, j) => j !== idx && x.name === v)) { alert('같은 이름의 과목이 있습니다'); name.value = sub.name; return; }
+      renameSubjectEverywhere(sub.name, v); sub.name = v; rebuildToday(); save(); renderSubjects();
     });
     mod.addEventListener('change', () => { sub.module = mod.value; save(); });
     del.addEventListener('click', () => {
-      if (state.settings.subjects.length <= 1) { alert('과목은 1개 이상 있어야 합니다.'); return; }
+      if (state.settings.subjects.length <= 1) { alert('과목은 1개 이상 있어야 합니다'); return; }
       if (!confirm(`'${sub.name}' 과목을 목록에서 지울까요? 이미 등록된 미션은 그대로 남습니다.`)) return;
-      state.settings.subjects.splice(idx, 1); save(); renderSubjects(); renderPlan();
+      state.settings.subjects.splice(idx, 1); save(); renderSubjects();
     });
     r.append(name, mod, del); box.appendChild(r);
   });
 }
 $('#btn-add-subject').addEventListener('click', () => {
-  if (state.settings.subjects.length >= 12) { alert('과목은 12개까지입니다.'); return; }
+  if (state.settings.subjects.length >= 12) { alert('과목은 12개까지입니다'); return; }
   let n = 1, name; do { name = `새 과목 ${n++}`; } while (state.settings.subjects.some(x => x.name === name));
   state.settings.subjects.push({ name, module: 'misc' }); save(); renderSubjects();
-  const inputs = $('#subject-rows').querySelectorAll('input'); const last = inputs[inputs.length - 1]; last.focus(); last.select();
+  const ins = $('#subject-rows').querySelectorAll('input'); const last = ins[ins.length - 1]; last.focus(); last.select();
 });
 $('#btn-pin-change').addEventListener('click', () => { pinBack = 'parent'; openPin(() => { alert('비밀번호를 바꿨습니다.'); show('parent'); }, 'set'); });
-
-// ---- 데이터 ----
-$('#btn-export').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `tankPlanner-${todayKey()}.json`; document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-});
-$('#btn-import').addEventListener('click', () => $('#file-import').click());
-$('#file-import').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    const s = JSON.parse(await f.text());
-    if (!s || !(s.version === 1 || s.version === 2) || !('attached' in s)) throw new Error('형식이 다릅니다');
-    if (!confirm(`가져올까요? 전차 ${s.tank || '없음'}, 부품 ${s.attached.length}개. 현재 데이터는 덮어써집니다.`)) return;
-    state = migrate(s); save(); location.reload();
-  } catch (err) { alert('가져오기 실패: ' + err.message); }
+$('#resetToday').addEventListener('click', () => {
+  const t = todayKey(); state.missions.items = state.missions.items.filter(m => m.status !== 'todo'); state.missions.date = t;
+  rebuildToday(); save(); alert('오늘 미션을 다시 만들었습니다');
 });
 $('#btn-test-unlock').addEventListener('click', () => {
   if (!state.tank) { alert('먼저 전차를 골라야 합니다.'); return; }
@@ -1605,6 +1663,26 @@ $('#btn-reset').addEventListener('click', () => {
   const pin = state.settings.pin;
   state = defaultState(); state.settings.pin = pin; save(); location.reload();
 });
+
+// ---- 데이터 ----
+const exportJSON = () => JSON.stringify(state, null, 2);
+$('#btn-export').addEventListener('click', () => {
+  const blob = new Blob([exportJSON()], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `tankPlanner-${todayKey()}.json`; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+$('#btn-export-show').addEventListener('click', () => { const ta = $('#exportText'); ta.style.display = ''; ta.value = exportJSON(); ta.focus(); ta.select(); });
+function importState(text) {
+  try {
+    const s = JSON.parse(text);
+    if (!s || !(s.version >= 1 && s.version <= 4) || !('attached' in s)) throw new Error('전차 앱 데이터가 아닙니다');
+    if (!confirm(`가져올까요? 전차 ${s.tank || '없음'}, 부품 ${s.attached.length}개. 현재 데이터는 덮어써집니다.`)) return;
+    state = migrate(s); save(); location.reload();
+  } catch (err) { alert('가져오기 실패: ' + err.message); }
+}
+$('#file-import').addEventListener('change', async e => { const f = e.target.files[0]; if (f) $('#importText').value = await f.text(); });
+$('#btn-import').addEventListener('click', () => { const v = $('#importText').value.trim(); if (!v) { alert('파일을 고르거나 글자를 붙여넣으세요'); return; } importState(v); });
 
 /* =====================================================================
    6. 시작
