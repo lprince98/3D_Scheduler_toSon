@@ -5249,7 +5249,7 @@ function renderHome() {
     btn.disabled = ms.status === 'done';
     btn.addEventListener('click', () => {
       if (ms.status === 'done') return;
-      if (stu && ms.status === 'todo' && !ms.detail) openDetailSheet(ms, 'start'); else openFocus(ms);   // 시작 전에 오늘 할 것 적기 (나중에 적기도 가능)
+      if (stu && ms.status === 'todo' && !ms.detail) openDetailSheet(ms, 'start'); else openFocus(ms);   // 시작 전에 오늘 할 것을 꼭 적기
     });
     card.appendChild(btn); list.appendChild(card);
   }
@@ -5531,7 +5531,7 @@ function finishFocus(ms) {
 }
 $('doneBtn').addEventListener('click', () => {
   const ms = findMission(state.focus);
-  if (ms && state.settings.studentDetail && !ms.detail) { openDetailSheet(ms, 'done'); return; }   // 끝나면 잠기니 마지막으로 한 번 더 물어봄
+  if (ms && state.settings.studentDetail && !ms.detail) { openDetailSheet(ms, 'done'); return; }   // (예전에 비워 두고 시작한 미션) 끝나기 전에 적기
   finishFocus(ms);
 });
 function showFocusDetail(ms) {
@@ -5558,25 +5558,30 @@ function openDetailSheet(ms, mode) {
   $('dsRecent').innerHTML = '';
   (state.recentDetails[ms.subject] || []).slice(0, 3).forEach(r => {
     const b = document.createElement('button'); b.textContent = r;
-    b.addEventListener('click', () => { inp.value = r; inp.focus(); }); $('dsRecent').appendChild(b);
+    b.addEventListener('click', () => { inp.value = r; inp.focus(); syncDsOk(); }); $('dsRecent').appendChild(b);
   });
   $('dsOk').textContent = mode === 'start' ? '적고 시작 ▶' : mode === 'done' ? '적고 끝내기 ✅' : '저장';
-  $('dsSkip').textContent = mode === 'start' ? '나중에 적기' : mode === 'done' ? '안 적고 끝내기' : '취소';
-  sheetEl.classList.add('on');
+  $('dsSkip').textContent = '취소';
+  sheetEl.classList.add('on'); syncDsOk();
   setTimeout(() => inp.focus(), 50);
 }
+// 적어야 진행 (나중에 적기 없음). 취소하면 시작·완료하지 않고 제자리로
 function closeDetailSheet(save) {
+  const v = $('dsInput').value.trim().slice(0, 30);
+  if (save && !v) { $('dsInput').focus(); return; }
   const { ms, mode } = sheet; sheet = null;
-  if (save) { const v = $('dsInput').value.trim().slice(0, 30); ms.detail = v; saveState(); }
+  if (save) { ms.detail = v; saveState(); }
   $('dsInput').blur(); sheetEl.classList.remove('on');
   const inFocus = focusEl.classList.contains('on');
-  if (mode === 'start') { openFocus(ms); return; }
-  if (mode === 'done') { finishFocus(ms); return; }
+  if (save && mode === 'start') { openFocus(ms); return; }
+  if (save && mode === 'done') { finishFocus(ms); return; }
   if (inFocus) showFocusDetail(ms); else { start(); renderHome(); }
 }
+function syncDsOk() { $('dsOk').disabled = !$('dsInput').value.trim(); }
 function batchim(w) { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
 $('dsOk').addEventListener('click', () => sheet && closeDetailSheet(true));
-$('dsSkip').addEventListener('click', () => sheet && closeDetailSheet(sheet.mode === 'done' ? false : false));
+$('dsSkip').addEventListener('click', () => sheet && closeDetailSheet(false));
+$('dsInput').addEventListener('input', syncDsOk);
 $('dsInput').addEventListener('keydown', e => { if (e.key === 'Enter' && sheet) { e.preventDefault(); closeDetailSheet(true); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && state.focus && focusEl.classList.contains('on')) { keepAwake(); tickFocus(); } });
 

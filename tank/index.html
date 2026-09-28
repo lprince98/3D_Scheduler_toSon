@@ -390,7 +390,7 @@
       <label for="focus-detail-input" id="focus-plan-label">오늘 뭐 할 거야?</label>
       <input id="focus-detail-input" maxlength="30" autocomplete="off" enterkeyhint="done">
       <div class="recent" id="focus-recent"></div>
-      <small>비워 두고 시작해도 돼요 — 나중에 적기</small>
+      <small>적어야 시작할 수 있어요</small>
     </div>
     <div id="focus-timer">20:00</div>
     <div id="focus-durations"></div>
@@ -1222,8 +1222,9 @@ function enterFocus(m) {
     const inp = $('#focus-detail-input');
     inp.value = m.detail || ''; inp.placeholder = m.note ? `예: ${m.note}` : '예: 수학익힘 34~35쪽';
     $('#focus-plan-label').textContent = `오늘 ${m.subject}${batchim(m.subject) ? '은' : '는'} 뭐 할 거야?`;
-    fillRecent($('#focus-recent'), m.subject, v => { inp.value = v; });
+    fillRecent($('#focus-recent'), m.subject, v => { inp.value = v; syncStart(); });
   }
+  syncStart();
   // 마지막 프레임을 작은 이미지로 남기고 3D를 완전히 멈춘다
   renderer.render(scene, camera);
   try { $('#focus-snap').src = canvas.toDataURL('image/jpeg', 0.6); } catch { $('#focus-snap').removeAttribute('src'); }
@@ -1264,9 +1265,16 @@ function tickFocus() {
   $('#focus-hint').textContent = over ? '시간 끝! 다 했으면 완료를 눌러요' : (wake.supported ? '숙제하는 동안 화면이 꺼지지 않아요' : '');
   if (over && !m.alerted) { m.alerted = true; save(); sfx.chime(); }
 }
+// 학생 입력 모드에서는 적어야 시작 (나중에 적기 없음)
+function syncStart() { const m = focusMission; $('#btn-start').disabled = !!(m && m.status === 'todo' && state.settings.studentDetail && !$('#focus-detail-input').value.trim()); }
+$('#focus-detail-input').addEventListener('input', syncStart);
 $('#btn-start').addEventListener('click', () => {
   const m = focusMission; if (!m || m.status !== 'todo') return;
-  if (state.settings.studentDetail) { m.detail = $('#focus-detail-input').value.trim().slice(0, 30); $('#focus-detail-input').blur(); }
+  if (state.settings.studentDetail) {
+    const v = $('#focus-detail-input').value.trim().slice(0, 30);
+    if (!v) { $('#focus-detail-input').focus(); return; }
+    m.detail = v; $('#focus-detail-input').blur();
+  }
   m.status = 'doing'; m.startedAt = Date.now(); m.alerted = false; save();
   screens.focus.classList.remove('ready'); showFocusDetail(m); sfx.tick(); tickFocus();
 });
@@ -1274,7 +1282,7 @@ $('#focus-detail-input').addEventListener('keydown', e => { if (e.key === 'Enter
 function finishFocus(m) { leaveFocus(); completeMission(m); }
 $('#btn-done').addEventListener('click', () => {
   const m = focusMission;
-  if (m && state.settings.studentDetail && !m.detail) { openDetailSheet(m, 'done'); return; }   // 끝나면 잠기니 마지막으로 한 번 더
+  if (m && state.settings.studentDetail && !m.detail) { openDetailSheet(m, 'done'); return; }   // (예전에 비워 두고 시작한 미션) 끝나기 전에 적기
   finishFocus(m);
 });
 function showFocusDetail(m) {
@@ -1298,21 +1306,26 @@ function openDetailSheet(m, mode) {
   sheet = { m, mode };
   $('#dsTitle').textContent = mode === 'done' ? `${m.subject}, 뭐 했는지 적어 줄래?` : `오늘 ${m.subject}${batchim(m.subject) ? '은' : '는'} 뭐 할 거야?`;
   const inp = $('#dsInput'); inp.value = m.detail || ''; inp.placeholder = m.note ? `예: ${m.note}` : '예: 수학익힘 34~35쪽';
-  fillRecent($('#dsRecent'), m.subject, v => { inp.value = v; inp.focus(); });
+  fillRecent($('#dsRecent'), m.subject, v => { inp.value = v; inp.focus(); syncDsOk(); });
   $('#dsOk').textContent = mode === 'done' ? '적고 완료' : '저장';
-  $('#dsSkip').textContent = mode === 'done' ? '안 적고 완료' : '취소';
+  $('#dsSkip').textContent = '취소';
+  syncDsOk();
   if (!focusMission) { renderOn = false; }                 // 차고에서 열면 키보드가 올라오는 동안 3D 정지
   $('#detailSheet').classList.add('on'); setTimeout(() => inp.focus(), 50);
 }
 function closeDetailSheet(saveIt) {
+  const v = $('#dsInput').value.trim().slice(0, 30);
+  if (saveIt && !v) { $('#dsInput').focus(); return; }
   const { m, mode } = sheet; sheet = null;
-  if (saveIt) { m.detail = $('#dsInput').value.trim().slice(0, 30); save(); }
+  if (saveIt) { m.detail = v; save(); }
   $('#dsInput').blur(); $('#detailSheet').classList.remove('on');
-  if (mode === 'done') { finishFocus(m); return; }
+  if (saveIt && mode === 'done') { finishFocus(m); return; }
   if (focusMission) showFocusDetail(m); else { renderOn = true; prev = performance.now(); resize(); renderGarage(); }
 }
 $('#dsOk').addEventListener('click', () => sheet && closeDetailSheet(true));
 $('#dsSkip').addEventListener('click', () => sheet && closeDetailSheet(false));
+function syncDsOk() { $('#dsOk').disabled = !$('#dsInput').value.trim(); }
+$('#dsInput').addEventListener('input', syncDsOk);
 $('#dsInput').addEventListener('keydown', e => { if (e.key === 'Enter' && sheet) { e.preventDefault(); closeDetailSheet(true); } });
 $('#btn-quit').addEventListener('click', () => { leaveFocus(); renderGarage(); });   // 시작 전이면 todo 그대로   // 진행 중 상태 유지, 나중에 "이어서"
 
