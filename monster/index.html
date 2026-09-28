@@ -276,6 +276,29 @@
   @keyframes flash { 0%,100% { opacity: 0; } 50% { opacity: .9; } }
   #flash { position: fixed; inset: 0; background: #fff; pointer-events: none; opacity: 0; z-index: 6; }
   #flash.go { animation: flash .35s ease-out 3; }
+  /* ---- 학생 세부사항 입력 ---- */
+  .card .info { cursor: pointer; }
+  .card .sub .todo { color: var(--accent); font-weight: 700; }
+  #focus .detail { font-size: 20px; font-weight: 700; color: #555; display: flex; align-items: center; gap: 8px; max-width: 90vw; text-align: center; }
+  #focus .detail button { min-height: 44px; padding: 0 12px; border-radius: 12px; border: 2px solid #ddd; background: #fff; font-size: 15px; font-weight: 700; }
+  #detailSheet { position: fixed; inset: 0; z-index: 12; background: rgba(0,0,0,.45); display: none; align-items: flex-start; justify-content: center;
+    padding: calc(6vh + env(safe-area-inset-top)) 16px 16px; }
+  #detailSheet.on { display: flex; }
+  #detailSheet .box { width: min(560px, 100%); padding: 20px; }
+  #detailSheet h2 { margin: 0 0 12px; font-size: 22px; }
+  #detailSheet input { width: 100%; min-height: 58px; font-size: 21px; padding: 8px 14px; border: 3px solid #ddd; border-radius: 14px; outline: none; }
+  #detailSheet input:focus { border-color: var(--accent); }
+  #detailSheet .recent { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  #detailSheet .recent:empty { display: none; }
+  #detailSheet .recent button { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid #eee; background: #fafafa; font-size: 16px; }
+  #detailSheet .acts { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .logDay { font-size: 14px; font-weight: 800; color: #777; margin: 10px 0 4px; }
+  .logRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #f0f0f0; font-size: 15px; }
+  .logRow .t { flex: 1; min-width: 0; }
+  .logRow .t small { color: #999; }
+  .logRow .st { font-size: 13px; font-weight: 700; color: #2ec4b6; white-space: nowrap; }
+  .logRow .st.no { color: #bbb; }
+  .logRow button { min-width: 0; min-height: 36px; padding: 0 10px; border-radius: 10px; border: 2px solid #ddd; background: #fff; font-size: 13px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -363,6 +386,7 @@
       </div>
       <div class="box"><h3>최근 7일</h3><div class="days7" id="days7"></div></div>
       <div class="box"><h3>과목별 (최근 4주)</h3><div id="subjectBars"></div><p style="font-size:13px;color:#888;margin:6px 0 0">어느 과목이 밀리는지 봅니다.</p></div>
+      <div class="box"><h3>공부 기록 (최근 14일)</h3><div id="studyLog"></div><p style="font-size:13px;color:#888;margin:6px 0 0">학생이 적은 "오늘 할 것"입니다. 완료한 뒤에는 여기서만 고칠 수 있습니다.</p></div>
       <div class="box"><h3>몬스터</h3><div id="stMonster" style="font-size:15px;color:#555;line-height:1.7"></div></div>
     </section>
     <section class="tab" id="tab-settings">
@@ -376,6 +400,7 @@
         <div class="line"><span>진화 기준 (%) <small>주간 달성률</small></span><div class="stepper"><button id="evMinus">−</button><b id="evVal">80</b><button id="evPlus">+</button></div></div>
         <div class="line"><span>타이머 기본 (분)</span><div class="stepper"><button id="tmMinus">−</button><b id="tmVal">20</b><button id="tmPlus">+</button></div></div>
         <div class="line"><span>파츠 해금 주기 <small>미션 n개마다 (4단계)</small></span><div class="stepper"><button id="ulMinus">−</button><b id="ulVal">7</b><button id="ulPlus">+</button></div></div>
+        <div class="line"><span>세부사항은 학생이 입력 <small>켜면 부모는 과목·시간만, 무엇을 할지는 학생이 적음</small></span><button id="detailToggle">켜짐</button></div>
         <div class="line"><span>효과음</span><button id="soundToggle">켜짐</button></div>
         <div class="line"><span>3D 품질 <small>낮음 권장 (발열)</small></span><button id="qualityBtn">낮음</button></div>
         <div class="line"><span>성능 표시</span><button id="statsToggle">켜짐</button></div>
@@ -427,6 +452,7 @@
 <div id="focus">
   <img class="still" id="still" alt="">
   <div class="mission"><span id="focusEmoji"></span><span id="focusName"></span></div>
+  <div class="detail" id="focusDetailRow"><span id="focusDetail"></span><button id="focusDetailEdit">✏️ 적기</button></div>
   <div class="ring">
     <svg viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="90"/><circle class="fill" id="ringFill" cx="100" cy="100" r="90"/></svg>
     <div class="time"><b id="timeText">20:00</b><span id="timeSub">집중!</span></div>
@@ -440,6 +466,18 @@
   </div>
 </div>
 <div id="flash"></div>
+<!-- 학생이 오늘 할 것 적기 -->
+<div id="detailSheet">
+  <div class="box">
+    <h2 id="dsTitle">오늘 뭐 할 거야?</h2>
+    <input id="dsInput" maxlength="30" autocomplete="off" enterkeyhint="done">
+    <div class="recent" id="dsRecent"></div>
+    <div class="acts">
+      <button class="big" id="dsOk">적고 시작</button>
+      <button class="big ghost" id="dsSkip">나중에 적기</button>
+    </div>
+  </div>
+</div>
 
 <!-- Three.js r186 (esbuild로 한 파일에 묶음). 파일 하나로 더블클릭 실행·호스팅 모두 가능 -->
 <script>
@@ -4725,7 +4763,8 @@ function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(st
 const state = loadState();
 const freshInstall = !Object.keys(state).length;
 state.version = 1;
-state.settings = Object.assign({ quality:'low', evolveRate:0.8, showStats:true, timerMinutes:20, sound:true, unlockEvery:7, pin:null }, state.settings || {});
+state.settings = Object.assign({ quality:'low', evolveRate:0.8, showStats:true, timerMinutes:20, sound:true, unlockEvery:7, pin:null, studentDetail:true }, state.settings || {});
+state.recentDetails = state.recentDetails || {};   // 과목별 학생이 최근 적은 것 { 과목: [최대 5개] }
 state.plans = state.plans || {};
 // 과목 목록: 부모가 추가·수정. 과목마다 몬스터 타입(카드 아이콘) 연결
 if (!Array.isArray(state.settings.subjects) || !state.settings.subjects.length) state.settings.subjects = DEFAULT_SUBJECTS.map(x => ({ ...x }));
@@ -4743,6 +4782,8 @@ if (state.monster) { state.monster.checkedWeeks = state.monster.checkedWeeks || 
 if (state.focus === undefined) state.focus = null;   // 진행 중인 집중 모드 (새로고침 복구용)
 state.days = state.days || {};
 if (state.monster === undefined) state.monster = null;
+// 예전 저장: 완료한 미션은 부모 분량을 학생 기록으로 옮겨 공부 기록이 비지 않게
+for (const k in state.days) (state.days[k].missions || []).forEach(m => { if (m.status === 'done' && m.detail === undefined && m.note) m.detail = m.note; });
 
 const pad = n => String(n).padStart(2, '0');
 function dateKey(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -4758,15 +4799,27 @@ function planFor(k) {   // 그 날의 미션 계획: 그 날짜에 따로 등록
   return (state.template[dowOf(k)] || []).map(p => ({ ...p }));
 }
 const hasAnyPlan = () => Object.keys(state.template).some(i => state.template[i].length) || Object.keys(state.plans).length > 0;
-function buildDay(k) {   // 계획 → 그날 미션 목록 (이미 완료한 미션은 유지)
-  const old = state.days[k]?.missions || [];
-  const kept = old.filter(m => m.status === 'done');
-  const fresh = planFor(k).map((p, i) => ({ id: `${k}-${i}-${Date.now()}`, subject: p.subject, note: p.note || '', type: subjectType(p.subject), status: 'todo', minutes: p.minutes || state.settings.timerMinutes }));
-  // 완료된 것과 같은 과목·분량이 계획에 있으면 그 자리는 완료 유지
+function buildDay(k) {   // 계획 → 그날 미션 목록
+  // 이미 완료·진행 중이거나 학생이 세부사항을 적어 둔 미션은, 같은 과목 안에서 앞에서부터 같은 자리에 그대로 둔다
+  const old = (state.days[k]?.missions || []).filter(m => m.status !== 'todo' || m.detail);
   const missions = [];
-  for (const f of fresh) { const i = kept.findIndex(m => m.subject === f.subject && (m.note || '') === f.note); if (i >= 0) { missions.push(kept.splice(i, 1)[0]); } else missions.push(f); }
-  missions.push(...kept);
+  planFor(k).forEach((p, i) => {
+    const j = old.findIndex(m => m.subject === p.subject);
+    if (j >= 0) {
+      const m = old.splice(j, 1)[0];
+      if (m.status !== 'done') { m.note = p.note || ''; m.minutes = p.minutes || state.settings.timerMinutes; }
+      missions.push(m);
+    } else missions.push({ id: `${k}-${i}-${Date.now()}`, subject: p.subject, note: p.note || '', type: subjectType(p.subject), status: 'todo', minutes: p.minutes || state.settings.timerMinutes });
+  });
+  missions.push(...old.filter(m => m.status !== 'todo'));   // 계획에서 빠졌어도 완료·진행 중인 것은 남김
   state.days[k] = { taps: state.days[k]?.taps || 0, missions };
+}
+// 카드·기록에 보일 세부사항: 학생 입력 모드면 학생이 적은 것, 아니면 부모 분량
+const shownDetail = ms => state.settings.studentDetail ? (ms.detail || '') : (ms.note || '');
+function rememberDetail(subject, text) {
+  if (!text) return;
+  const l = (state.recentDetails[subject] || []).filter(x => x !== text); l.unshift(text);
+  state.recentDetails[subject] = l.slice(0, 5);
 }
 function todayData() {
   const k = dateKey();
@@ -5187,11 +5240,17 @@ function renderHome() {
     const card = document.createElement('div'); card.className = `card ${ms.status}`;
     const t = typeById(ms.type);
     const mins = ms.minutes || state.settings.timerMinutes;
-    card.innerHTML = `<div class="emoji">${t.emoji}</div><div class="info"><div class="subject">${ms.subject}</div><div class="sub">${ms.note ? ms.note + ' · ' : ''}${ms.status === 'done' ? '완료 ✓' : ms.status === 'active' ? '하는 중…' : `${mins}분`}</div></div>`;
+    const dt = shownDetail(ms), stu = state.settings.studentDetail;
+    const detailHtml = dt ? `${esc(dt)}${stu && ms.status !== 'done' ? ' ✏️' : ''} · ` : stu && ms.status !== 'done' ? '<span class="todo">✏️ 오늘 할 것 적기</span> · ' : '';
+    card.innerHTML = `<div class="emoji">${t.emoji}</div><div class="info"><div class="subject">${ms.subject}</div><div class="sub">${detailHtml}${ms.status === 'done' ? '완료 ✓' : ms.status === 'active' ? '하는 중…' : `${mins}분`}</div></div>`;
+    if (stu && ms.status !== 'done') card.querySelector('.info').addEventListener('click', () => openDetailSheet(ms, 'edit'));   // 완료 전까지는 고치기 가능
     const btn = document.createElement('button');
     btn.textContent = ms.status === 'done' ? '완료' : ms.status === 'active' ? '계속' : '시작';
     btn.disabled = ms.status === 'done';
-    btn.addEventListener('click', () => { if (ms.status !== 'done') openFocus(ms); });
+    btn.addEventListener('click', () => {
+      if (ms.status === 'done') return;
+      if (stu && ms.status === 'todo' && !ms.detail) openDetailSheet(ms, 'start'); else openFocus(ms);   // 시작 전에 오늘 할 것 적기 (나중에 적기도 가능)
+    });
     card.appendChild(btn); list.appendChild(card);
   }
   if (!d.missions.length) {
@@ -5202,6 +5261,7 @@ function renderHome() {
 }
 function completeMission(ms) {
   ms.status = 'done'; ms.doneAt = new Date().toISOString();
+  if (ms.detail) rememberDetail(ms.subject, ms.detail);
   state.monster.growth++;                                   // 일일 성장: 크기 + 무늬
   state.totalDone++;
   let unlocked = null;                                      // 파츠 해금 (누적 n개마다)
@@ -5426,6 +5486,7 @@ function resumeFocus() { const ms = findMission(state.focus); if (ms && ms.statu
 function enterFocus(ms) {
   const t = typeById(ms.type);
   $('focusEmoji').textContent = t.emoji; $('focusName').textContent = ms.subject;
+  showFocusDetail(ms);
   $('still').src = captureStill();
   stop();                                             // 3D 렌더링 완전 정지
   alarmed = false;
@@ -5463,11 +5524,60 @@ $('quitBtn').addEventListener('click', () => {         // 나중에 다시: 미�
   const ms = findMission(state.focus); if (ms) ms.status = 'todo';
   state.focus = null; saveState(); leaveFocus(); renderHome();
 });
-$('doneBtn').addEventListener('click', () => {
-  const ms = findMission(state.focus); state.focus = null; saveState();
+function finishFocus(ms) {
+  state.focus = null; saveState();
   leaveFocus();
   if (ms) completeMission(ms); else renderHome();      // 3D 재개 후 완료 연출 (점프 + 효과음 + 색종이)
+}
+$('doneBtn').addEventListener('click', () => {
+  const ms = findMission(state.focus);
+  if (ms && state.settings.studentDetail && !ms.detail) { openDetailSheet(ms, 'done'); return; }   // 끝나면 잠기니 마지막으로 한 번 더 물어봄
+  finishFocus(ms);
 });
+function showFocusDetail(ms) {
+  const stu = state.settings.studentDetail, dt = shownDetail(ms);
+  $('focusDetailRow').style.display = stu || dt ? '' : 'none';
+  $('focusDetail').textContent = dt;
+  $('focusDetailEdit').style.display = stu ? '' : 'none';
+  $('focusDetailEdit').textContent = dt ? '✏️ 고치기' : '✏️ 오늘 할 것 적기';
+}
+$('focusDetailEdit').addEventListener('click', () => { const ms = findMission(state.focus); if (ms) openDetailSheet(ms, 'edit'); });
+
+/* ==========================================================
+   학생이 "오늘 할 것" 적기 — mode: start(시작 전) | edit(고치기) | done(다 했어 직전)
+   ========================================================== */
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sheetEl = $('detailSheet');
+let sheet = null;
+function openDetailSheet(ms, mode) {
+  sheet = { ms, mode, wasRunning: running };
+  const inFocus = focusEl.classList.contains('on');
+  if (!inFocus) stop();                                   // 키보드가 올라와 화면 크기가 바뀌는 동안 3D 정지
+  $('dsTitle').textContent = mode === 'done' ? `${ms.subject}, 뭐 했는지 적어 줄래?` : `오늘 ${ms.subject}${batchim(ms.subject) ? '은' : '는'} 뭐 할 거야?`;
+  const inp = $('dsInput'); inp.value = ms.detail || ''; inp.placeholder = ms.note ? `예: ${ms.note}` : '예: 수학익힘 34~35쪽';
+  $('dsRecent').innerHTML = '';
+  (state.recentDetails[ms.subject] || []).slice(0, 3).forEach(r => {
+    const b = document.createElement('button'); b.textContent = r;
+    b.addEventListener('click', () => { inp.value = r; inp.focus(); }); $('dsRecent').appendChild(b);
+  });
+  $('dsOk').textContent = mode === 'start' ? '적고 시작 ▶' : mode === 'done' ? '적고 끝내기 ✅' : '저장';
+  $('dsSkip').textContent = mode === 'start' ? '나중에 적기' : mode === 'done' ? '안 적고 끝내기' : '취소';
+  sheetEl.classList.add('on');
+  setTimeout(() => inp.focus(), 50);
+}
+function closeDetailSheet(save) {
+  const { ms, mode } = sheet; sheet = null;
+  if (save) { const v = $('dsInput').value.trim().slice(0, 30); ms.detail = v; saveState(); }
+  $('dsInput').blur(); sheetEl.classList.remove('on');
+  const inFocus = focusEl.classList.contains('on');
+  if (mode === 'start') { openFocus(ms); return; }
+  if (mode === 'done') { finishFocus(ms); return; }
+  if (inFocus) showFocusDetail(ms); else { start(); renderHome(); }
+}
+function batchim(w) { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
+$('dsOk').addEventListener('click', () => sheet && closeDetailSheet(true));
+$('dsSkip').addEventListener('click', () => sheet && closeDetailSheet(sheet.mode === 'done' ? false : false));
+$('dsInput').addEventListener('keydown', e => { if (e.key === 'Enter' && sheet) { e.preventDefault(); closeDetailSheet(true); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && state.focus && focusEl.classList.contains('on')) { keepAwake(); tickFocus(); } });
 
 /* ==========================================================
@@ -5547,9 +5657,9 @@ function dayBox({ title, cnt, today, list, getList, changed, doneOf, revert }) {
   if (revert) { const r = document.createElement('button'); r.className = 'mini rev'; r.textContent = '반복으로'; r.addEventListener('click', revert); box.querySelector('.cnt').appendChild(r); }
   list.forEach((p, i) => {
     const row = document.createElement('div'); row.className = 'mrow';
-    const done = doneOf(p);
+    const done = doneOf(p, i, list);
     row.innerHTML = `<span class="subj">${p.subject}</span>`;
-    const note = document.createElement('input'); note.className = 'note'; note.placeholder = '분량 (예: 3단원 2쪽)'; note.value = p.note || ''; note.maxLength = 20;
+    const note = document.createElement('input'); note.className = 'note'; note.placeholder = state.settings.studentDetail ? '안내 (선택 · 학생에게 예시로 보임)' : '분량 (예: 3단원 2쪽)'; note.value = p.note || ''; note.maxLength = 20;
     note.addEventListener('change', () => { getList()[i].note = note.value.trim(); changed(); });
     const min = document.createElement('div'); min.className = 'min';
     const mm = document.createElement('button'); mm.className = 'mini'; mm.textContent = '−';
@@ -5597,7 +5707,10 @@ function renderPlan() {
       title: `${DAY_NAMES[di]} ${fmtMD(k)}${k === today ? ' · 오늘' : ''}`,
       cnt: `${own ? '이 날만' : '반복'} · ${list.length}개${doneN ? ` · 완료 ${doneN}` : ''}`,
       today: k === today, list, getList: () => ensurePlan(k), changed: () => planChanged(k),
-      doneOf: p => (state.days[k]?.missions || []).some(m => m.status === 'done' && m.subject === p.subject && (m.note || '') === (p.note || '')),
+      doneOf: (p, i, l) => {   // 같은 과목 안에서 앞에서부터 완료 개수만큼 "완료"
+        const nth = l.slice(0, i).filter(x => x.subject === p.subject).length;
+        return nth < (state.days[k]?.missions || []).filter(m => m.status === 'done' && m.subject === p.subject).length;
+      },
       revert: own ? () => { delete state.plans[k]; planChanged(k); renderPlan(); } : null,
     }));
   });
@@ -5642,12 +5755,36 @@ function renderStats() {
     const t = typeById(subjectType(name));
     return `<div class="sbar"><span>${t.emoji} ${name}</span><div class="tr"><i style="width:${v.p ? v.d / v.p * 100 : 0}%;background:${t.aura}"></i></div><span>${v.d}/${v.p}</span></div>`;
   }).join('') || '<p style="font-size:14px;color:#888">아직 기록이 없습니다</p>';
+  renderStudyLog();
   const m = state.monster;
   $('stMonster').innerHTML = m ? `이름: <b>${m.name}</b> (${typeById(m.type).name} 타입)<br>누적 완료: <b>${m.growth}</b>개 · 진화 단계: ${STAGE_NAMES[m.stage] || m.stage}<br>만든 날: ${m.createdAt.slice(0, 10)}` : '아직 몬스터가 없습니다';
 }
 
+function renderStudyLog() {
+  const box = $('studyLog'); box.innerHTML = '';
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i); const k = dateKey(d);
+    const ms = state.days[k]?.missions || []; if (!ms.length) continue;
+    const h = document.createElement('div'); h.className = 'logDay'; h.textContent = `${fmtMD(k)} (${DAY_NAMES[(d.getDay() + 6) % 7]})${i === 0 ? ' · 오늘' : ''}`; box.appendChild(h);
+    ms.forEach(m => {
+      const r = document.createElement('div'); r.className = 'logRow';
+      const dt = shownDetail(m), t = typeById(m.type);
+      const st = m.status === 'done' ? '완료 ✓' : m.status === 'active' ? '하는 중' : '아직';
+      r.innerHTML = `<span class="t">${t.emoji} <b>${esc(m.subject)}</b> — ${dt ? esc(dt) : '<small>(안 적음)</small>'}</span><span class="st${m.status === 'done' ? '' : ' no'}">${st}</span>`;
+      if (state.settings.studentDetail) {
+        const b = document.createElement('button'); b.textContent = '고치기';
+        b.addEventListener('click', () => { const v = prompt(`${m.subject} — 학생이 적은 내용 (30자)`, m.detail || ''); if (v === null) return; m.detail = v.trim().slice(0, 30); saveState(); renderStudyLog(); });
+        r.appendChild(b);
+      }
+      box.appendChild(r);
+    });
+  }
+  if (!box.children.length) box.innerHTML = '<p style="font-size:14px;color:#888">아직 기록이 없습니다</p>';
+}
+
 /* ---- 설정 ---- */
 function refreshSettings() {
+  $('detailToggle').textContent = state.settings.studentDetail ? '켜짐' : '꺼짐';
   renderSubjects();
   $('evVal').textContent = Math.round(state.settings.evolveRate * 100);
   $('tmVal').textContent = state.settings.timerMinutes;
@@ -5700,6 +5837,7 @@ $('addSubject').addEventListener('click', () => {
 step('evMinus', 'evolveRate', 50, 100, -10, 100); step('evPlus', 'evolveRate', 50, 100, 10, 100);
 step('tmMinus', 'timerMinutes', 5, 60, -5); step('tmPlus', 'timerMinutes', 5, 60, 5);
 step('ulMinus', 'unlockEvery', 3, 15, -1); step('ulPlus', 'unlockEvery', 3, 15, 1);
+$('detailToggle').addEventListener('click', () => { state.settings.studentDetail = !state.settings.studentDetail; saveState(); refreshSettings(); });
 $('soundToggle').addEventListener('click', () => { state.settings.sound = !state.settings.sound; saveState(); refreshSettings(); if (state.settings.sound) sfx('tap'); });
 $('qualityBtn').addEventListener('click', () => { state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; saveState(); location.reload(); });
 $('statsToggle').addEventListener('click', () => { state.settings.showStats = !state.settings.showStats; saveState(); refreshSettings(); });

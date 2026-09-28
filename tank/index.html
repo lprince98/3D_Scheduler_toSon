@@ -154,6 +154,34 @@
     object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: #6f6a62;
   }
   @media (orientation: portrait) { #focus-snap { width: 120px; height: 80px; } }
+  /* 학생이 적는 "오늘 할 것" */
+  .mission .title { cursor: pointer; }
+  .mission .need { grid-column: 1; color: #a07400; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .mission .act { grid-row: 1 / span 3; }
+  #focus-detail-row { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: rgba(255,255,255,.9); }
+  #focus-detail-row button { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; font-size: 15px; font-weight: 700; }
+  #focus-plan { width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  #focus-plan label { font-size: 17px; color: rgba(255,255,255,.85); }
+  #focus-plan input, #detailSheet input { width: 100%; min-height: 58px; font: inherit; font-size: 21px; padding: 8px 14px; border: 3px solid rgba(255,255,255,.3); border-radius: 14px; background: #fff; color: var(--ink); outline: none; }
+  #focus-plan input:focus, #detailSheet input:focus { border-color: var(--accent); }
+  #focus-plan small { color: rgba(255,255,255,.6); font-size: 14px; }
+  .recent { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .recent:empty { display: none; }
+  .recent button { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; font-size: 16px; }
+  #screen-focus:not(.ready) #focus-plan, #screen-focus.ready #focus-detail-row { display: none; }
+  #detailSheet { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: none; align-items: flex-start; justify-content: center; padding: calc(var(--sat) + 6vh) 16px 16px; }
+  #detailSheet.on { display: flex; }
+  #detailSheet .box { width: min(560px, 100%); background: #2b2925; color: #fff; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  #detailSheet h2 { margin: 0; font-size: 22px; }
+  #detailSheet .acts { display: flex; flex-direction: column; gap: 10px; }
+  #detailSheet .acts .btn { min-height: 60px; font-size: 19px; }
+  .logDay { font-size: 14px; font-weight: 800; color: var(--muted); margin: 10px 0 4px; }
+  .logRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #efeae0; font-size: 15px; }
+  .logRow .t { flex: 1; min-width: 0; }
+  .logRow .t small { color: #999; }
+  .logRow .st { font-size: 13px; font-weight: 700; color: var(--ok); white-space: nowrap; }
+  .logRow .st.no { color: #bbb; }
+  .logRow button { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 2px solid #d8d1c2; background: #fff; font-size: 13px; font-weight: 700; }
   /* 결합 순간 화면 번쩍임 */
   #stage-area::after {
     content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
@@ -357,6 +385,13 @@
   <div id="focus-wrap">
     <span id="focus-badge" class="badge"></span>
     <h1 id="focus-title"></h1>
+    <div id="focus-detail-row"><span id="focus-detail"></span><button id="focus-detail-edit">✏️ 적기</button></div>
+    <div id="focus-plan">
+      <label for="focus-detail-input" id="focus-plan-label">오늘 뭐 할 거야?</label>
+      <input id="focus-detail-input" maxlength="30" autocomplete="off" enterkeyhint="done">
+      <div class="recent" id="focus-recent"></div>
+      <small>비워 두고 시작해도 돼요 — 나중에 적기</small>
+    </div>
     <div id="focus-timer">20:00</div>
     <div id="focus-durations"></div>
     <div id="focus-hint"></div>
@@ -412,6 +447,15 @@
 </section>
 
 <!-- 부모 모드 (몬스터 앱과 같은 구성) -->
+<div id="detailSheet">
+  <div class="box">
+    <h2 id="dsTitle">오늘 뭐 할 거야?</h2>
+    <input id="dsInput" maxlength="30" autocomplete="off" enterkeyhint="done">
+    <div class="recent" id="dsRecent"></div>
+    <div class="acts"><button class="btn" id="dsOk">저장</button><button class="btn ghost" id="dsSkip">취소</button></div>
+  </div>
+</div>
+
 <section id="screen-parent" class="screen">
   <div id="parent-head"><h1>부모 모드</h1><button id="btn-parent-close" class="btn">닫기</button></div>
   <div id="parent-tabs">
@@ -442,6 +486,7 @@
     <div class="pcard"><h3>최근 7일</h3><div class="days7" id="days7"></div></div>
     <div class="pcard"><h3>과목별 (최근 4주)</h3><div id="subjectBars"></div>
       <p class="hint">어느 과목이 밀리는지 봅니다. 괄호 안은 연결된 전차 부위와 그 부위의 회색 임시 부품 수.</p></div>
+    <div class="pcard"><h3>공부 기록 (최근 14일)</h3><div id="studyLog"></div><p class="hint">학생이 적은 "오늘 할 것"입니다. 완료한 뒤에는 여기서만 고칠 수 있습니다.</p></div>
     <div class="pcard"><h3>전차</h3><div id="stTank" style="font-size:15px;color:#555;line-height:1.7"></div></div>
   </div>
 
@@ -453,6 +498,7 @@
     <div class="pcard">
       <div class="line"><span>단계 해금 기준 (%) <small>주간 달성률</small></span><div class="stepper"><button id="ulMinus">−</button><b id="ulVal">80</b><button id="ulPlus">+</button></div></div>
       <div class="line"><span>타이머 기본 (분) <small>새로 넣는 미션의 시간</small></span><div class="stepper"><button id="tmMinus">−</button><b id="tmVal">20</b><button id="tmPlus">+</button></div></div>
+      <div class="line"><span>세부사항은 학생이 입력 <small>켜면 부모는 과목·시간만, 무엇을 할지는 학생이 적음</small></span><button id="detailToggle">켜짐</button></div>
       <div class="line"><span>효과음</span><button id="soundToggle">켜짐</button></div>
       <div class="line"><span>3D 품질 <small>낮음 권장 (발열)</small></span><button id="qualityBtn">낮음</button></div>
       <div class="line"><span>성능 표시 <small>왼쪽 아래 fps·삼각형 수</small></span><button id="statsToggle">켜짐</button></div>
@@ -611,7 +657,7 @@ function weekKey(d = new Date()) {   // 그 주 월요일 날짜
   const m = new Date(d); const day = (m.getDay() + 6) % 7; m.setDate(m.getDate() - day); return todayKey(m);
 }
 const defaultSubjects = () => Object.entries(DEFAULT_SUBJECTS).map(([name, module]) => ({ name, module }));
-const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', sound: true, showStats: true, pin: null, subjects: defaultSubjects() });
+const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', sound: true, showStats: true, pin: null, subjects: defaultSubjects(), studentDetail: true });
 // 비밀번호는 해시로 저장 (아이가 저장값을 봐도 모르게 하는 용도, 보안용 아님). 몬스터 앱과 같은 방식
 function hashPin(p) { let h = 5381; for (const c of p + '|tank') h = ((h << 5) + h + c.charCodeAt(0)) | 0; return 'h:' + (h >>> 0); }
 // 과목 → 모듈 (부모가 정한 과목 목록 기준, 지운 과목은 승무원 장비로)
@@ -626,6 +672,7 @@ const defaultState = () => ({
   missions: { date: null, items: [] },   // 오늘 미션
   history: {},                           // { 'YYYY-MM-DD': [ {subject, title, minutes, status} ] } 지난 날들
   plan: {},                              // { 'YYYY-MM-DD'(월요일): { 0..6: [ {subject, title, minutes} ] } } 부모가 등록한 주간 미션
+  recentDetails: {},                     // 과목별 학생이 최근 적은 "오늘 할 것"
   settings: defaultSettings(),
 });
 let state = load();
@@ -655,6 +702,10 @@ function migrate(s) {
   if (!Array.isArray(s.settings.subjects) || !s.settings.subjects.length) s.settings.subjects = defaultSubjects();
   if (s.settings.pin && !String(s.settings.pin).startsWith('h:')) s.settings.pin = hashPin(String(s.settings.pin));   // 예전 평문 비밀번호 → 해시
   s.history = s.history || {}; s.plan = s.plan || {};
+  s.recentDetails = s.recentDetails || {};   // 과목별 학생이 최근 적은 것 { 과목: [최대 5개] }
+  // 예전 저장: 완료한 미션은 부모 분량을 학생 기록으로 옮겨 공부 기록이 비지 않게
+  const fill = m => { if (m.status === 'done' && m.detail === undefined && m.note) m.detail = m.note; };
+  (s.missions && s.missions.items || []).forEach(fill); for (const k in s.history) s.history[k].forEach(fill);
   return s;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn('저장 실패', e); } }
@@ -672,21 +723,37 @@ function specFor(dateKey) {
 function ensureToday() {
   const t = todayKey();
   if (state.missions.date !== t) {
-    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, note, title, minutes, status }) => ({ subject, note: note || '', title, minutes, status }));
+    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, note, detail, title, minutes, status }) => ({ subject, note: note || '', detail: detail || '', title, minutes, status }));
     state.missions = { date: t, items: [] };
     rebuildToday();
   }
   save();
 }
-// 오늘 미션을 명세에서 다시 만든다. 이미 시작·완료한 항목은 같은 자리에 같은 과목이면 유지
+// 오늘 미션을 명세에서 다시 만든다. 이미 시작·완료했거나 학생이 "오늘 할 것"을 적어 둔 항목은
+// 같은 과목 안에서 앞에서부터 같은 자리에 그대로 둔다 (계획에서 빠져도 시작·완료한 것은 남김)
 function rebuildToday() {
-  const t = state.missions.date, old = state.missions.items;
-  state.missions.items = specFor(t).map((sp, i) => {
-    const o = old[i];
-    if (o && o.status !== 'todo' && o.subject === sp.subject) return o;
-    return { id: `${t}-${i}`, subject: sp.subject, note: sp.note || '', title: sp.title || `${sp.subject} 숙제`, minutes: sp.minutes || state.settings.defaultMinutes, status: 'todo' };
+  const t = state.missions.date, old = state.missions.items.filter(m => m.status !== 'todo' || m.detail);
+  const items = specFor(t).map((sp, i) => {
+    const j = old.findIndex(m => m.subject === sp.subject);
+    if (j >= 0) {
+      const o = old.splice(j, 1)[0];
+      if (o.status === 'todo') { o.note = sp.note || ''; o.minutes = sp.minutes || state.settings.defaultMinutes; }
+      return o;
+    }
+    return { id: `${t}-${i}-${Date.now()}`, subject: sp.subject, note: sp.note || '', title: sp.title || `${sp.subject} 숙제`, minutes: sp.minutes || state.settings.defaultMinutes, status: 'todo' };
   });
+  state.missions.items = items.concat(old.filter(m => m.status !== 'todo'));
 }
+// 보일 세부사항: 학생 입력 모드면 학생이 적은 것, 아니면 부모 분량
+const shownDetail = m => state.settings.studentDetail ? (m.detail || '') : (m.note || '');
+const titleOf = m => { const d = shownDetail(m); return d ? `${m.subject} · ${d}` : `${m.subject} 숙제`; };
+function rememberDetail(subject, text) {
+  if (!text) return;
+  const l = (state.recentDetails[subject] || []).filter(x => x !== text); l.unshift(text);
+  state.recentDetails[subject] = l.slice(0, 5);
+}
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function batchim(w) { const c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
 // 통계용: 날짜별 항목 (지난 날 + 오늘)
 function itemsOn(dateKey) { return dateKey === state.missions.date ? state.missions.items : (state.history[dateKey] || []); }
 function weekStats(wk = weekKey()) {
@@ -1050,10 +1117,12 @@ function renderGarage() {
     const el = document.createElement('div');
     el.className = 'mission ' + m.status;
     const label = m.status === 'todo' ? '시작' : m.status === 'doing' ? '이어서' : '완료됨';
-    el.innerHTML = `<div class="title">${m.title}</div>
-      <div class="meta"><span class="badge ${mod.cls}">${mod.name}</span><span>${m.minutes}분</span></div>
+    const stu = state.settings.studentDetail, need = stu && m.status !== 'done' && !m.detail;
+    el.innerHTML = `<div class="title">${esc(titleOf(m))}${stu && m.status !== 'done' && m.detail ? ' ✏️' : ''}</div>
+      <div class="meta"><span class="badge ${mod.cls}">${mod.name}</span><span>${m.minutes}분</span></div>${need ? '<div class="need">✏️ 오늘 할 것 적기</div>' : ''}
       <button class="btn act" ${m.status === 'done' ? 'disabled' : ''}>${label}</button>`;
     el.querySelector('.act').addEventListener('click', () => onMission(m));
+    if (stu && m.status !== 'done') el.querySelectorAll('.title, .need').forEach(x => x.addEventListener('click', () => openDetailSheet(m, 'edit')));   // 완료 전까지 고치기
     box.appendChild(el);
   }
   if (!state.missions.items.length) {
@@ -1084,7 +1153,9 @@ function onMission(m) {
   enterFocus(m);   // todo면 시간 선택 후 "시작", doing이면 바로 타이머
 }
 function completeMission(m) {
-  m.status = 'done'; m.doneAt = Date.now(); save();
+  m.status = 'done'; m.doneAt = Date.now();
+  if (m.detail) rememberDetail(m.subject, m.detail);
+  save();
   renderGarage();
   setTimeout(() => { attachNext(modOf(m.subject)); save(); renderGarage(); }, 350);   // 차고가 보인 뒤 결합
 }
@@ -1139,10 +1210,20 @@ function enterFocus(m) {
   focusMission = m;
   const mod = MODULES[modOf(m.subject)];
   $('#focus-badge').className = 'badge ' + mod.cls; $('#focus-badge').textContent = mod.name;
-  $('#focus-title').textContent = m.title;
+  $('#focus-title').textContent = m.subject;
   const ready = m.status === 'todo';
   screens.focus.classList.toggle('ready', ready);
   if (ready) renderDurations(m);
+  showFocusDetail(m);
+  // 시작 전: 오늘 할 것 적기 (비워 두면 나중에 적기)
+  const stu = state.settings.studentDetail;
+  $('#focus-plan').style.display = ready && stu ? '' : 'none';
+  if (ready && stu) {
+    const inp = $('#focus-detail-input');
+    inp.value = m.detail || ''; inp.placeholder = m.note ? `예: ${m.note}` : '예: 수학익힘 34~35쪽';
+    $('#focus-plan-label').textContent = `오늘 ${m.subject}${batchim(m.subject) ? '은' : '는'} 뭐 할 거야?`;
+    fillRecent($('#focus-recent'), m.subject, v => { inp.value = v; });
+  }
   // 마지막 프레임을 작은 이미지로 남기고 3D를 완전히 멈춘다
   renderer.render(scene, camera);
   try { $('#focus-snap').src = canvas.toDataURL('image/jpeg', 0.6); } catch { $('#focus-snap').removeAttribute('src'); }
@@ -1185,10 +1266,54 @@ function tickFocus() {
 }
 $('#btn-start').addEventListener('click', () => {
   const m = focusMission; if (!m || m.status !== 'todo') return;
+  if (state.settings.studentDetail) { m.detail = $('#focus-detail-input').value.trim().slice(0, 30); $('#focus-detail-input').blur(); }
   m.status = 'doing'; m.startedAt = Date.now(); m.alerted = false; save();
-  screens.focus.classList.remove('ready'); sfx.tick(); tickFocus();
+  screens.focus.classList.remove('ready'); showFocusDetail(m); sfx.tick(); tickFocus();
 });
-$('#btn-done').addEventListener('click', () => { const m = focusMission; leaveFocus(); completeMission(m); });
+$('#focus-detail-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+function finishFocus(m) { leaveFocus(); completeMission(m); }
+$('#btn-done').addEventListener('click', () => {
+  const m = focusMission;
+  if (m && state.settings.studentDetail && !m.detail) { openDetailSheet(m, 'done'); return; }   // 끝나면 잠기니 마지막으로 한 번 더
+  finishFocus(m);
+});
+function showFocusDetail(m) {
+  const stu = state.settings.studentDetail, d = shownDetail(m);
+  $('#focus-detail-row').style.display = stu || d ? '' : 'none';
+  $('#focus-detail').textContent = d;
+  $('#focus-detail-edit').style.display = stu ? '' : 'none';
+  $('#focus-detail-edit').textContent = d ? '✏️ 고치기' : '✏️ 오늘 할 것 적기';
+}
+$('#focus-detail-edit').addEventListener('click', () => { if (focusMission) openDetailSheet(focusMission, 'edit'); });
+function fillRecent(box, subject, pick) {
+  box.innerHTML = '';
+  (state.recentDetails[subject] || []).slice(0, 3).forEach(r => {
+    const b = document.createElement('button'); b.textContent = r; b.addEventListener('click', () => pick(r)); box.appendChild(b);
+  });
+}
+
+// ---- "오늘 할 것" 입력 창 — mode: edit(고치기) | done(완료 직전) ----
+let sheet = null;
+function openDetailSheet(m, mode) {
+  sheet = { m, mode };
+  $('#dsTitle').textContent = mode === 'done' ? `${m.subject}, 뭐 했는지 적어 줄래?` : `오늘 ${m.subject}${batchim(m.subject) ? '은' : '는'} 뭐 할 거야?`;
+  const inp = $('#dsInput'); inp.value = m.detail || ''; inp.placeholder = m.note ? `예: ${m.note}` : '예: 수학익힘 34~35쪽';
+  fillRecent($('#dsRecent'), m.subject, v => { inp.value = v; inp.focus(); });
+  $('#dsOk').textContent = mode === 'done' ? '적고 완료' : '저장';
+  $('#dsSkip').textContent = mode === 'done' ? '안 적고 완료' : '취소';
+  if (!focusMission) { renderOn = false; }                 // 차고에서 열면 키보드가 올라오는 동안 3D 정지
+  $('#detailSheet').classList.add('on'); setTimeout(() => inp.focus(), 50);
+}
+function closeDetailSheet(saveIt) {
+  const { m, mode } = sheet; sheet = null;
+  if (saveIt) { m.detail = $('#dsInput').value.trim().slice(0, 30); save(); }
+  $('#dsInput').blur(); $('#detailSheet').classList.remove('on');
+  if (mode === 'done') { finishFocus(m); return; }
+  if (focusMission) showFocusDetail(m); else { renderOn = true; prev = performance.now(); resize(); renderGarage(); }
+}
+$('#dsOk').addEventListener('click', () => sheet && closeDetailSheet(true));
+$('#dsSkip').addEventListener('click', () => sheet && closeDetailSheet(false));
+$('#dsInput').addEventListener('keydown', e => { if (e.key === 'Enter' && sheet) { e.preventDefault(); closeDetailSheet(true); } });
 $('#btn-quit').addEventListener('click', () => { leaveFocus(); renderGarage(); });   // 시작 전이면 todo 그대로   // 진행 중 상태 유지, 나중에 "이어서"
 
 /* =====================================================================
@@ -1476,7 +1601,7 @@ function dayBox({ title, cnt, today, list, getList, doneOf, revert }) {
     const row = document.createElement('div'); row.className = 'drow';
     const mod = MODULES[modOf(p.subject)];
     row.innerHTML = `<span class="subj">${p.subject}<span class="badge ${mod.cls}">${mod.name}</span></span>`;
-    const note = document.createElement('input'); note.className = 'note'; note.placeholder = '분량 (예: 3단원 2쪽)'; note.value = p.note || ''; note.maxLength = 20;
+    const note = document.createElement('input'); note.className = 'note'; note.placeholder = state.settings.studentDetail ? '안내 (선택 · 학생에게 예시로 보임)' : '분량 (예: 3단원 2쪽)'; note.value = p.note || ''; note.maxLength = 20;
     note.addEventListener('change', () => { const q = getList()[i]; q.note = note.value.trim(); retitle(q); planChanged(); });
     const min = document.createElement('div'); min.className = 'min';
     const mm = document.createElement('button'); mm.className = 'mini'; mm.textContent = '−';
@@ -1486,7 +1611,7 @@ function dayBox({ title, cnt, today, list, getList, doneOf, revert }) {
     mp.addEventListener('click', () => { const q = getList()[i]; q.minutes = Math.min(60, q.minutes + 5); mv.textContent = `${q.minutes}분`; planChanged(); });
     min.append(mm, mv, mp);
     row.append(note, min);
-    if (doneOf(p)) { const st = document.createElement('span'); st.className = 'st'; st.textContent = '완료 ✓'; row.append(st); }
+    if (doneOf(p, i, list)) { const st = document.createElement('span'); st.className = 'st'; st.textContent = '완료 ✓'; row.append(st); }
     else { const del = document.createElement('button'); del.className = 'mini del'; del.textContent = '✕'; del.addEventListener('click', () => { getList().splice(i, 1); planChanged(); renderPlan(); }); row.append(del); }
     box.appendChild(row);
   });
@@ -1527,7 +1652,10 @@ function renderPlan() {
       cnt: `${own ? '이 날만' : '반복'} · ${list.length}개${doneN ? ` · 완료 ${doneN}` : ''}`,
       today: k === today, list,
       getList: () => ensureDayPlan(k),
-      doneOf: p => items.some(m => m.status === 'done' && m.subject === p.subject && (m.note || '') === (p.note || '')),
+      doneOf: (p, i, l) => {   // 같은 과목 안에서 앞에서부터 완료 개수만큼 "완료"
+        const nth = l.slice(0, i).filter(x => x.subject === p.subject).length;
+        return nth < items.filter(m => m.status === 'done' && m.subject === p.subject).length;
+      },
       revert: own ? () => { dropDayPlan(k); planChanged(); renderPlan(); } : null,
     }));
   });
@@ -1582,6 +1710,7 @@ function renderStats() {
     return `<div class="mbar"><span>${name}</span><div class="track"><i style="width:${p ? d / p * 100 : 0}%;background:var(--c-${mk})"></i></div><span>${d}/${p}</span></div>
       <div class="hint" style="margin:-4px 0 6px 120px">(${mod.name}${greyBy[mk] ? ` · 회색 ${greyBy[mk]}개` : ''})</div>`;
   }).join('') || '<p class="hint">아직 기록이 없습니다.</p>';
+  renderStudyLog();
   const tk = TANKS.find(x => x.id === state.tank);
   const grey = state.attached.filter(a => !a.ok).length;
   $('#stTank').innerHTML = tk
@@ -1589,9 +1718,30 @@ function renderStats() {
     : `아직 고른 전차가 없습니다<br>완성한 전차: ${state.garage.length}대`;
 }
 
+function renderStudyLog() {
+  const box = $('#studyLog'); box.innerHTML = ''; const t = todayKey();
+  for (let i = 0; i < 14; i++) {
+    const k = addDays(t, -i), items = itemsOn(k); if (!items.length) continue;
+    const h = document.createElement('div'); h.className = 'logDay'; h.textContent = `${fmtMD(k)} (${DOW_NAMES[dow(new Date(k + 'T00:00:00'))]})${i === 0 ? ' · 오늘' : ''}`; box.appendChild(h);
+    items.forEach(m => {
+      const r = document.createElement('div'); r.className = 'logRow';
+      const d = shownDetail(m), st = m.status === 'done' ? '완료 ✓' : m.status === 'doing' ? '하는 중' : '아직';
+      r.innerHTML = `<span class="t"><b>${esc(m.subject)}</b> — ${d ? esc(d) : '<small>(안 적음)</small>'}</span><span class="st${m.status === 'done' ? '' : ' no'}">${st}</span>`;
+      if (state.settings.studentDetail) {
+        const b = document.createElement('button'); b.textContent = '고치기';
+        b.addEventListener('click', () => { const v = prompt(`${m.subject} — 학생이 적은 내용 (30자)`, m.detail || ''); if (v === null) return; m.detail = v.trim().slice(0, 30); save(); renderStudyLog(); });
+        r.appendChild(b);
+      }
+      box.appendChild(r);
+    });
+  }
+  if (!box.children.length) box.innerHTML = '<p class="hint">아직 기록이 없습니다.</p>';
+}
+
 // ---- 설정 ----
 function renderSettings() {
   const st = state.settings;
+  $('#detailToggle').textContent = st.studentDetail ? '켜짐' : '꺼짐';
   $('#ulVal').textContent = Math.round(st.unlockRatio * 100);
   $('#tmVal').textContent = st.defaultMinutes;
   $('#soundToggle').textContent = st.sound !== false ? '켜짐' : '꺼짐';
@@ -1605,6 +1755,7 @@ stepper('ulMinus', st => { st.unlockRatio = Math.max(0.5, Math.round(st.unlockRa
 stepper('ulPlus',  st => { st.unlockRatio = Math.min(1, Math.round(st.unlockRatio * 10 + 1) / 10); });
 stepper('tmMinus', st => { st.defaultMinutes = Math.max(5, st.defaultMinutes - 5); });
 stepper('tmPlus',  st => { st.defaultMinutes = Math.min(60, st.defaultMinutes + 5); });
+$('#detailToggle').addEventListener('click', () => { state.settings.studentDetail = !state.settings.studentDetail; save(); renderSettings(); });
 $('#soundToggle').addEventListener('click', () => { state.settings.sound = state.settings.sound === false; save(); renderSettings(); if (state.settings.sound) sfx.tick(); });
 $('#qualityBtn').addEventListener('click', () => { state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; save(); applyQuality(); renderSettings(); });
 $('#statsToggle').addEventListener('click', () => { state.settings.showStats = state.settings.showStats === false; save(); renderSettings(); });
@@ -1646,7 +1797,7 @@ $('#btn-add-subject').addEventListener('click', () => {
 });
 $('#btn-pin-change').addEventListener('click', () => { pinBack = 'parent'; openPin(() => { alert('비밀번호를 바꿨습니다.'); show('parent'); }, 'set'); });
 $('#resetToday').addEventListener('click', () => {
-  const t = todayKey(); state.missions.items = state.missions.items.filter(m => m.status !== 'todo'); state.missions.date = t;
+  const t = todayKey(); state.missions.items = state.missions.items.filter(m => m.status !== 'todo' || m.detail); state.missions.date = t;
   rebuildToday(); save(); alert('오늘 미션을 다시 만들었습니다');
 });
 $('#btn-test-unlock').addEventListener('click', () => {
