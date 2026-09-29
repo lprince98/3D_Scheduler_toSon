@@ -194,6 +194,8 @@
   .item .mini svg, .mini svg { width: 32px; height: 32px; display: block; }
   .item .nm { flex: 1; min-width: 80px; }
   .item .done { color: #3f9a4a; font-weight: 700; }
+  .pitem { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px dashed #eadfca; }
+  .pitem .nm { flex: 1; min-width: 100px; } .pitem .ok { color: #3f9a4a; font-weight: 700; } .pitem .no { color: #a89880; }
   .step { display: inline-flex; align-items: center; gap: 4px; }
   .step b { min-width: 44px; text-align: center; font-weight: 600; }
   .picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
@@ -5654,6 +5656,11 @@ function rebuildToday() {
   day.missions = next; if (!next.every(m => m.status === 'done')) day.cheered = false;
   save();
 }
+// 할 일 찾기: 오늘 → 지난 날 순서 (하는 중에 자정이 지나도 그 날 할 일로 끝낼 수 있게)
+function findMission(id) {
+  for (const k of Object.keys(state.days).sort().reverse()) { const m = (state.days[k].missions || []).find(x => x.id === id); if (m) return m; }
+  return null;
+}
 const allDoneToday = () => { const ms = ensureToday().missions; return ms.length > 0 && ms.every(m => m.status === 'done'); };
 
 /* ---------- 조사 (받침 따라 랑/이랑, 를/을) ---------- */
@@ -5781,12 +5788,12 @@ function closeDoing() {
   state.focus = null; save();
   start(); poke();
 }
-$('dSpeak').onclick = () => { const m = ensureToday().missions.find(x => x.id === doingId); if (m) speakSubject(subj(m.sid)); };
+$('dSpeak').onclick = () => { const m = findMission(doingId); if (m) speakSubject(subj(m.sid)); };
 $('dLater').onclick = () => { closeDoing(); renderHome(); };        // 나중에: 할 일은 남고 타이머만 처음으로 (벌칙 없음)
 let doneLock = 0;
 $('dDone').onclick = () => {
   if (performance.now() - doneLock < 1000) return; doneLock = performance.now();
-  const m = ensureToday().missions.find(x => x.id === doingId); if (!m) { closeDoing(); return; }
+  const m = findMission(doingId); if (!m) { closeDoing(); return; }
   closeDoing();
   if (missionOpts(m).confirm) { m.status = 'wait'; save(); renderHome(); openStamp(m); return; }   // 부모 확인 도장 (3단계)
   completeMission(m);
@@ -6115,7 +6122,7 @@ $('stPad').addEventListener('click', async e => {
   if (k !== '✓') { if (st.buf.length < (pinMode ? 6 : 3)) st.buf += k; drawStamp(); if (!(pinMode && st.buf.length === 6)) return; }
   const ok = pinMode ? (await hashPin(st.buf)) === state.settings.pinHash : Number(st.buf) === st.a + st.b;
   if (!ok) { st.buf = ''; drawStamp('다시 확인해 주세요'); $('sq').classList.remove('shake'); void $('sq').offsetWidth; $('sq').classList.add('shake'); return; }
-  const m = ensureToday().missions.find(x => x.id === st.mid);
+  const m = findMission(st.mid);
   closeStamp(); sfx('stamp'); buzz(60);
   if (m) completeMission(m);
 });
@@ -6125,10 +6132,14 @@ const corner = $('corner'), parentEl = $('parent');
 corner.addEventListener('click', e => { e.preventDefault(); unlock(); askPin(openParent); });
 corner.addEventListener('contextmenu', e => e.preventDefault());
 
-const TABS = [['plan', '할 일'], ['subj', '할 일 종류'], ['stats', '달성'], ['set', '설정'], ['test', '테스트'], ['data', '데이터']];
+const TABS = [['plan', '할 일'], ['past', '지난 날'], ['subj', '할 일 종류'], ['stats', '달성'], ['set', '설정'], ['test', '테스트'], ['data', '데이터']];
 const pv = { tab: 'plan', planMode: 'weekly', weekOff: 0, pickFor: null, msg: '', wipeArm: 0 };
 function openParent() { parentEl.classList.add('on'); stop(); hideHand(); renderParent(); }
-function closeParent() { parentEl.classList.remove('on'); pv.pickFor = null; start(); poke(); renderHome(); }
+function closeParent() {
+  parentEl.classList.remove('on'); pv.pickFor = null; start(); poke(); renderHome();
+  // 지난 날에서 처리한 할 일: 쌓인 뼈를 하나씩 (나머지는 뼈를 붙일 때마다 이어서 나옴)
+  if (pv.pastGiven && state.dino.pending > 0) { pv.pastGiven = false; state.dino.pending--; save(); setTimeout(() => missionDone(), 300); }
+}
 $('pClose').onclick = closeParent;
 $('ptabs').addEventListener('click', e => { const t = e.target.closest('button')?.dataset.t; if (t) { pv.tab = t; pv.pickFor = null; pv.msg = ''; renderParent(); $('pbody').scrollTop = 0; } });
 
@@ -6173,7 +6184,7 @@ function planChanged() { save(); rebuildToday(); renderParent(); }
 function renderParent() {
   $('ptabs').innerHTML = TABS.map(([t, n]) => `<button data-t="${t}" class="${pv.tab === t ? 'on' : ''}">${n}</button>`).join('');
   const b = $('pbody'); const top = b.scrollTop;
-  b.innerHTML = ({ plan: tabPlan, subj: tabSubj, stats: tabStats, set: tabSet, test: tabTest, data: tabData })[pv.tab]();
+  b.innerHTML = ({ plan: tabPlan, past: tabPast, subj: tabSubj, stats: tabStats, set: tabSet, test: tabTest, data: tabData })[pv.tab]();
   b.scrollTop = top;
   if (pv.tab === 'data') $('jsonOut') && ($('jsonOut').value = '');
 }
@@ -6248,6 +6259,24 @@ function rate(keys, sid) {
   return { t, d, p: t ? Math.round(d / t * 100) : null };
 }
 const pct = r => r.p == null ? '–' : `${r.p}% (${r.d}/${r.t})`;
+/* 지난 날: 자정이 지나 오늘 할 일이 새로 나와도, 지난 7일의 할 일을 보고 못 누른 것을 "다 했어"로 처리
+   (처리한 만큼 뼈가 쌓이고, 부모 모드를 닫으면 바위가 나옴) */
+function tabPast() {
+  let h = '<h3>지난 날</h3><p class="note">최근 7일의 할 일입니다. 아이가 하고 나서 못 누른 것을 "다 했어로 처리"하면 뼈 1개가 쌓이고, 부모 모드를 닫으면 바위가 나옵니다.</p>';
+  let any = false;
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i); const k = keyOf(d), ms = state.days[k]?.missions || [];
+    if (!ms.length) continue; any = true;
+    const done = ms.filter(m => m.status === 'done').length;
+    h += `<h3 style="margin-top:14px">${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]}) <small style="font-weight:400;color:#8a7760">${done}/${ms.length} 완료</small></h3>`;
+    h += ms.map(m => { const s = subj(m.sid);
+      return `<div class="pitem"><span class="mini">${ICON[s.icon](s.color)}</span><span class="nm">${esc(s.name)}${m.late ? ' <small style="color:#8a7760">· 나중에 처리</small>' : ''}</span>`
+        + (m.status === 'done' ? '<span class="ok">다 했어 ✓</span>' : `<span class="no">${m.status === 'wait' ? '도장 기다림' : '안 함'}</span><button class="sm pri" data-a="pastDone" data-k="${k}" data-id="${m.id}">다 했어로 처리</button>`) + '</div>'; }).join('');
+  }
+  if (!any) h += '<div class="out">최근 7일 동안 할 일이 없었어요.</div>';
+  if (state.dino.pending > 0) h += `<div class="out">쌓인 뼈 ${state.dino.pending}개 — 부모 모드를 닫으면 바위가 나와요.</div>`;
+  return h;
+}
 function tabStats() {
   const today = todayKey(), wk = weekKeys(0).filter(k => k <= today);
   const now = new Date(), mk = Object.keys(state.days).filter(k => k.startsWith(`${now.getFullYear()}-${pad(now.getMonth() + 1)}`));
@@ -6347,6 +6376,11 @@ $('pbody').addEventListener('click', async e => {
     planChanged(); return;
   }
   if (t.dataset.add) { const list = listFor(t.dataset.w); if (list.length < MAX_PER_DAY) list.push(itemFor(t.dataset.add)); pv.pickFor = null; planChanged(); return; }
+  if (a === 'pastDone') {
+    const m = (state.days[t.dataset.k]?.missions || []).find(x => x.id === t.dataset.id);
+    if (m && m.status !== 'done') { m.status = 'done'; m.doneAt = Date.now(); m.late = true; state.dino.pending++; pv.pastGiven = true; save(); }
+    renderParent(); return;
+  }
   if (a === 'pick') { pv.pickFor = t.dataset.w; renderParent(); return; }
   if (a === 'pickclose') { pv.pickFor = null; renderParent(); return; }
   if (a === 'mode') { pv.planMode = t.dataset.v; pv.pickFor = null; renderParent(); return; }
@@ -6431,7 +6465,7 @@ if (!state.dino.chosen && !state.dino.awake && state.dino.placed === 0) setTimeo
 else if (state.dino.awake && !state.dino.name) setTimeout(openDeco, 600);
 else giftOrResume();
 // 하는 중이던 할 일이 있으면 이어서 (새로고침·앱 전환 뒤)
-if (state.focus) { const m = ensureToday().missions.find(x => x.id === state.focus.mid && x.status === 'todo'); if (m) setTimeout(() => openDoing(m, true), 300); else { state.focus = null; save(); } }
+if (state.focus) { const m = findMission(state.focus.mid); if (m && m.status === 'todo') setTimeout(() => openDoing(m, true), 300); else { state.focus = null; save(); } }
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(() => {});
 
 // 확인용 (브라우저 콘솔)

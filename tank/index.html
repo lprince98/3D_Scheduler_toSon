@@ -182,6 +182,27 @@
   .logRow .st { font-size: 13px; font-weight: 700; color: var(--ok); white-space: nowrap; }
   .logRow .st.no { color: #bbb; }
   .logRow button { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 2px solid #d8d1c2; background: #fff; font-size: 13px; font-weight: 700; }
+  /* 지난 날 보기 */
+  #btn-past { min-height: 40px; padding: 0 12px; border: 2px solid rgba(255,255,255,.35); border-radius: 12px; background: rgba(255,255,255,.1); color: #fff; font-size: 14px; font-weight: 700; }
+  #btn-past.alert { border-color: var(--accent); color: var(--accent); }
+  #panel h2 { align-items: center; gap: 8px; }
+  #panel h2 .grow { flex: 1; }
+  #pastSheet { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; padding: calc(var(--sat) + 16px) 16px calc(var(--sab) + 16px); }
+  #pastSheet.on { display: flex; }
+  #pastSheet .box { width: min(620px, 100%); max-height: 100%; background: #2b2925; color: #fff; border-radius: 20px; padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 8px; }
+  #pastSheet h2 { margin: 0; font-size: 22px; }
+  #pastSheet .hint { margin: 0; font-size: 13px; color: rgba(255,255,255,.6); }
+  #pastList { overflow-y: auto; flex: 1; min-height: 0; }
+  .pastDay h4 { margin: 12px 0 6px; font-size: 16px; display: flex; justify-content: space-between; }
+  .pastDay h4 span { font-weight: 400; opacity: .6; font-size: 14px; }
+  .pastRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.07); margin-bottom: 6px; }
+  .pastRow .tx { flex: 1; min-width: 0; }
+  .pastRow .tx b { display: block; font-size: 16px; }
+  .pastRow .tx small { color: rgba(255,255,255,.55); font-size: 13px; }
+  .pastRow .st { font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--ok); }
+  .pastRow .st.no { color: rgba(255,255,255,.4); }
+  .pastRow .btn { min-height: 44px; padding: 0 14px; font-size: 15px; white-space: nowrap; }
+  #pastSheet .btn.ghost { min-height: 56px; }
   /* 결합 순간 화면 번쩍임 */
   #stage-area::after {
     content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
@@ -363,7 +384,7 @@
     <div id="toast"></div>
   </div>
   <aside id="panel">
-    <h2>오늘 미션 <span id="today-str"></span></h2>
+    <h2>오늘 미션 <span id="today-str"></span><i class="grow"></i><button id="btn-past">📅 지난 날</button></h2>
     <div id="missions"></div>
     <div id="progress">
       <div class="row"><span>이번 주 진행</span><small id="progress-text"></small></div>
@@ -453,6 +474,16 @@
     <input id="dsInput" maxlength="30" autocomplete="off" enterkeyhint="done">
     <div class="recent" id="dsRecent"></div>
     <div class="acts"><button class="btn" id="dsOk">저장</button><button class="btn ghost" id="dsSkip">취소</button></div>
+  </div>
+</div>
+
+<!-- 지난 날 보기: 날짜가 바뀐 뒤에도 지난 미션을 보고 완료 처리 (부모 비밀번호) -->
+<div id="pastSheet">
+  <div class="box">
+    <h2>📅 지난 날</h2>
+    <p class="hint">최근 7일. 못 누른 미션은 "완료 처리"로 끝낼 수 있어요 (부모 비밀번호)</p>
+    <div id="pastList"></div>
+    <button class="btn ghost" id="pastClose">닫기</button>
   </div>
 </div>
 
@@ -723,7 +754,7 @@ function specFor(dateKey) {
 function ensureToday() {
   const t = todayKey();
   if (state.missions.date !== t) {
-    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ subject, note, detail, title, minutes, status }) => ({ subject, note: note || '', detail: detail || '', title, minutes, status }));
+    if (state.missions.date) state.history[state.missions.date] = state.missions.items.map(({ id, subject, note, detail, title, minutes, status, doneAt, late }) => ({ id, subject, note: note || '', detail: detail || '', title, minutes, status, ...(doneAt ? { doneAt } : {}), ...(late ? { late } : {}) }));
     state.missions = { date: t, items: [] };
     rebuildToday();
   }
@@ -1111,6 +1142,7 @@ function enterGarage() {
 }
 function renderGarage() {
   $('#today-str').textContent = state.missions.date.slice(5).replace('-', '/');
+  const po = pastOpen(); $('#btn-past').textContent = po ? `📅 어제 못 끝낸 것 ${po}` : '📅 지난 날'; $('#btn-past').classList.toggle('alert', !!po);
   const box = $('#missions'); box.innerHTML = '';
   for (const m of state.missions.items) {
     const mod = MODULES[modOf(m.subject)];
@@ -1201,6 +1233,45 @@ $('#btn-change').addEventListener('click', () => { pendingTank = state.tank; ren
 $('#btn-decor').addEventListener('click', () => enterDecor('build'));
 $('#btn-list').addEventListener('click', () => enterList());
 $('#btn-parent').addEventListener('click', () => openPin(() => enterParent()));
+
+/* ---- 지난 날 보기 — 자정이 지나 오늘 미션이 새로 만들어져도, 지난 7일의 미션을 보고
+        못 끝낸 것(시작 전·하는 중)을 부모 비밀번호로 완료 처리 (부품 결합은 평소와 같음) ---- */
+const PAST_DAYS = 7, DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
+const pastKeys = () => Array.from({ length: PAST_DAYS }, (_, i) => addDays(state.missions.date, -(i + 1)));
+const pastOpen = () => (state.history[pastKeys()[0]] || []).filter(m => m.status !== 'done').length;   // 어제 못 끝낸 것
+let pastUnlockedAt = 0;   // 비밀번호를 한 번 넣으면 2분 동안은 다시 묻지 않음
+function openPast() { renderPast(); $('#pastSheet').classList.add('on'); }
+function renderPast() {
+  const box = $('#pastList'); box.innerHTML = '';
+  for (const k of pastKeys()) {
+    const items = state.history[k] || []; if (!items.length) continue;
+    const d = new Date(k + 'T00:00:00'), done = items.filter(m => m.status === 'done').length;
+    const day = document.createElement('div'); day.className = 'pastDay';
+    day.innerHTML = `<h4>${d.getMonth() + 1}/${d.getDate()} (${DOW_KO[d.getDay()]})<span>${done}/${items.length} 완료</span></h4>`;
+    for (const m of items) {
+      const row = document.createElement('div'); row.className = 'pastRow';
+      const dt = shownDetail(m), fin = m.status === 'done';
+      row.innerHTML = `<div class="tx"><b>${esc(m.subject)}</b><small>${[dt && esc(dt), m.late && '나중에 완료 처리'].filter(Boolean).join(' · ') || '—'}</small></div>`
+        + (fin ? '<div class="st">완료 ✓</div>' : `<div class="st no">${m.status === 'doing' ? '하던 중' : '안 함'}</div><button class="btn">완료 처리</button>`);
+      if (!fin) row.querySelector('button').addEventListener('click', () => pastComplete(m));
+      day.appendChild(row);
+    }
+    box.appendChild(day);
+  }
+  if (!box.children.length) box.innerHTML = '<p class="hint" style="text-align:center;padding:20px 0">최근 7일 동안 미션이 없었어요</p>';
+}
+function pastComplete(m) {
+  const go = () => {
+    show('garage'); if (m.status === 'done') return;
+    m.late = true; delete m.startedAt;
+    completeMission(m);                    // 차고에서 부품 결합 연출
+  };
+  $('#pastSheet').classList.remove('on');
+  if (Date.now() - pastUnlockedAt < 120000) { go(); return; }
+  pinBack = 'garage'; openPin(() => { pastUnlockedAt = Date.now(); go(); });
+}
+$('#btn-past').addEventListener('click', openPast);
+$('#pastClose').addEventListener('click', () => $('#pastSheet').classList.remove('on'));
 
 /* =====================================================================
    5b. 집중 모드 — 3D 정지, 큰 타이머, 화면 꺼짐 방지

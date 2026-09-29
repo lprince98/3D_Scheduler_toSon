@@ -299,6 +299,29 @@
   .logRow .st { font-size: 13px; font-weight: 700; color: #2ec4b6; white-space: nowrap; }
   .logRow .st.no { color: #bbb; }
   .logRow button { min-width: 0; min-height: 36px; padding: 0 10px; border-radius: 10px; border: 2px solid #ddd; background: #fff; font-size: 13px; font-weight: 700; }
+  /* 지난 날 보기 */
+  .homeHead { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; }
+  .homeHead h3 { margin: 0; font-size: 15px; color: #555; }
+  .homeHead button { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 2px solid #e4e4e4; background: #fff; font-size: 15px; font-weight: 700; color: #555; }
+  .homeHead button.alert { border-color: var(--accent); color: var(--accent); }
+  #pastSheet { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; }
+  #pastSheet.on { display: flex; }
+  #pastSheet .box { width: min(620px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; padding: 18px 18px 14px; margin: 0; }
+  #pastSheet h2 { margin: 0 0 4px; font-size: 22px; }
+  #pastSheet .hint { margin: 0 0 10px; font-size: 13px; color: #888; }
+  #pastList { overflow-y: auto; flex: 1; min-height: 0; }
+  .pastDay { margin-bottom: 14px; }
+  .pastDay h4 { margin: 0 0 6px; font-size: 16px; display: flex; justify-content: space-between; color: #444; }
+  .pastDay h4 span { font-weight: 600; color: #999; font-size: 14px; }
+  .pastRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: #f7f7f7; margin-bottom: 6px; }
+  .pastRow .em { font-size: 22px; width: 30px; text-align: center; }
+  .pastRow .tx { flex: 1; min-width: 0; }
+  .pastRow .tx b { display: block; font-size: 16px; }
+  .pastRow .tx small { color: #888; font-size: 13px; }
+  .pastRow .st { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .pastRow .st.ok { color: #2a9d5c; } .pastRow .st.no { color: #bbb; }
+  .pastRow button { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; white-space: nowrap; }
+  #pastClose { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -340,7 +363,7 @@
         <div class="bar"><div id="progFill" style="width:0%"></div></div>
       </div>
       <div id="newMonsterRow" class="row"></div>
-      <h3 style="margin:0 0 8px;font-size:15px;color:#555">오늘 미션</h3>
+      <div class="homeHead"><h3>오늘 미션</h3><button id="pastBtn">📅 지난 날</button></div>
       <div id="missions"></div>
     </section>
   </div>
@@ -466,6 +489,15 @@
   </div>
 </div>
 <div id="flash"></div>
+<!-- 지난 날 보기: 날짜가 바뀐 뒤에도 지난 미션을 보고 완료 처리 (부모 비밀번호) -->
+<div id="pastSheet">
+  <div class="box">
+    <h2>📅 지난 날</h2>
+    <p class="hint">최근 7일. 못 누른 미션은 "완료 처리"로 끝낼 수 있어요 (부모 비밀번호)</p>
+    <div id="pastList"></div>
+    <button class="big ghost" id="pastClose">닫기</button>
+  </div>
+</div>
 <!-- 학생이 오늘 할 것 적기 -->
 <div id="detailSheet">
   <div class="box">
@@ -5235,6 +5267,7 @@ function renderHome() {
     else nm.innerHTML = '<div class="allDone" style="font-size:16px;padding:6px 0">🏆 이번 달 완성! 다음 달에 새 몬스터를 만들 수 있어</div>';
   }
   const d = todayData();
+  const po = pastOpen(); $('pastBtn').textContent = po ? `📅 지난 날 · 어제 못 끝낸 것 ${po}` : '📅 지난 날'; $('pastBtn').classList.toggle('alert', !!po);
   const list = $('missions'); list.innerHTML = '';
   for (const ms of d.missions) {
     const card = document.createElement('div'); card.className = `card ${ms.status}`;
@@ -5584,6 +5617,48 @@ $('dsSkip').addEventListener('click', () => sheet && closeDetailSheet(false));
 $('dsInput').addEventListener('input', syncDsOk);
 $('dsInput').addEventListener('keydown', e => { if (e.key === 'Enter' && sheet) { e.preventDefault(); closeDetailSheet(true); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && state.focus && focusEl.classList.contains('on')) { keepAwake(); tickFocus(); } });
+
+/* ==========================================================
+   지난 날 보기 — 자정이 지나 오늘 미션이 새로 만들어져도, 지난 7일의 미션을 보고
+   못 끝낸 것(시작 전·하는 중)을 부모 비밀번호로 완료 처리 (성장·파츠 해금은 평소와 같음)
+   ========================================================== */
+const PAST_DAYS = 7, DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
+function pastKeys() { const out = []; for (let i = 1; i <= PAST_DAYS; i++) { const d = new Date(); d.setDate(d.getDate() - i); out.push(dateKey(d)); } return out; }
+const pastOpen = () => (state.days[pastKeys()[0]]?.missions || []).filter(m => m.status !== 'done').length;   // 어제 못 끝낸 것
+let pastUnlockedAt = 0;   // 비밀번호를 한 번 넣으면 2분 동안은 다시 묻지 않음
+function openPast() { renderPast(); $('pastSheet').classList.add('on'); }
+function renderPast() {
+  const box = $('pastList'); box.innerHTML = '';
+  for (const k of pastKeys()) {
+    const ms = state.days[k]?.missions || []; if (!ms.length) continue;
+    const d = new Date(k + 'T00:00:00'), done = ms.filter(m => m.status === 'done').length;
+    const day = document.createElement('div'); day.className = 'pastDay';
+    day.innerHTML = `<h4>${d.getMonth() + 1}/${d.getDate()} (${DOW_KO[d.getDay()]})<span>${done}/${ms.length} 완료</span></h4>`;
+    for (const ms1 of ms) {
+      const row = document.createElement('div'); row.className = 'pastRow';
+      const dt = shownDetail(ms1), fin = ms1.status === 'done';
+      row.innerHTML = `<div class="em">${typeById(ms1.type).emoji}</div><div class="tx"><b>${esc(ms1.subject)}</b><small>${[dt && esc(dt), ms1.late && '나중에 완료 처리'].filter(Boolean).join(' · ') || '—'}</small></div>`
+        + (fin ? '<div class="st ok">완료 ✓</div>' : `<div class="st no">${ms1.status === 'active' ? '하던 중' : '안 함'}</div><button>완료 처리</button>`);
+      if (!fin) row.querySelector('button').addEventListener('click', () => pastComplete(ms1));
+      day.appendChild(row);
+    }
+    box.appendChild(day);
+  }
+  if (!box.children.length) box.innerHTML = '<div class="allDone" style="font-size:17px;color:#999">최근 7일 동안 미션이 없었어요</div>';
+}
+async function pastComplete(ms) {
+  if (Date.now() - pastUnlockedAt > 120000) {
+    const ok = state.settings.pin ? await askPin('enter') : await askPin('set');
+    if (!ok) return; pastUnlockedAt = Date.now();
+  }
+  if (ms.status === 'done') return;
+  if (state.focus && state.focus.missionId === ms.id) { state.focus = null; if (focusEl.classList.contains('on')) leaveFocus(); }
+  ms.late = true;
+  $('pastSheet').classList.remove('on');
+  completeMission(ms);                     // 홈 화면에서 성장 연출 (진화 조건도 평소처럼 확인)
+}
+$('pastBtn').addEventListener('click', openPast);
+$('pastClose').addEventListener('click', () => $('pastSheet').classList.remove('on'));
 
 /* ==========================================================
    부모 모드: 비밀번호 → 미션 등록 / 달성률 / 설정 / 데이터
