@@ -30,15 +30,17 @@
     padding: 16px calc(18px + env(safe-area-inset-right)) 16px 0; }
   .card { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px;
     background: #FFFBF2; border-radius: 30px; padding: 12px 14px 12px 12px; box-shadow: 0 5px 0 rgba(120,90,50,.18); }
-  .card .ic { width: 104px; height: 104px; border-radius: 24px; display: grid; place-items: center; flex: 0 0 auto; }
+  /* 카드 수(--n, 최대 5)에 맞춰 크기를 줄임: 가로 = 화면 높이, 세로 = 화면 폭 기준 */
+  #side { --n: 3; --ic: clamp(56px, calc((100vh - 32px - (var(--n) - 1) * 18px) / var(--n) - 26px), 104px); --go: calc(var(--ic) * .81); }
+  .card .ic { width: var(--ic); height: var(--ic); border-radius: 24px; display: grid; place-items: center; flex: 0 0 auto; }
   .card .ic svg { width: 80%; height: 80%; }
-  .card .go { width: 84px; height: 84px; border-radius: 50%; border: none; background: #3f9a4a; box-shadow: 0 6px 0 #2b7334;
+  .card .go { width: var(--go); height: var(--go); border-radius: 50%; border: none; background: #3f9a4a; box-shadow: 0 6px 0 #2b7334;
     display: grid; place-items: center; padding: 0; flex: 0 0 auto; }
   .card .go svg { width: 58%; height: 58%; margin-left: 6px; }
   .card .go:active { transform: translateY(4px); box-shadow: 0 2px 0 #2b7334; }
   .card.done { background: #F3EEE3; }
   .card.done .ic { opacity: .55; }
-  .card .stamp { width: 84px; height: 84px; transform: rotate(-14deg); animation: stampIn .5s ease-out; }
+  .card .stamp { width: var(--go); height: var(--go); transform: rotate(-14deg); animation: stampIn .5s ease-out; }
   @keyframes stampIn { 0% { transform: scale(2) rotate(-14deg); opacity: 0; } 100% { transform: scale(1) rotate(-14deg); opacity: 1; } }
   .card.bump { animation: bump .35s; }
   @keyframes bump { 40% { transform: scale(.95); } }
@@ -52,7 +54,8 @@
   @media (orientation: portrait) {
     #side { left: 0; top: auto; width: auto; flex-direction: row; justify-content: center; gap: 14px;
       padding: 0 16px calc(20px + env(safe-area-inset-bottom)); }
-    #side .card { flex: 1 1 0; max-width: 230px; flex-direction: column; padding: 14px; gap: 12px; }
+    #side { --ic: clamp(56px, calc((100vw - 32px - (var(--n) - 1) * 14px) / var(--n) - 28px), 104px); }
+    #side .card { flex: 1 1 0; min-width: 0; max-width: 230px; flex-direction: column; padding: 14px; gap: 12px; }
     .phint { align-self: center; max-width: 240px; }
   }
 
@@ -4586,7 +4589,7 @@ const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad(
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
-const MAX_PER_DAY = 3;
+const MAX_PER_DAY = 5;
 const DINO_NAME = { trex: '티라노사우루스', tricera: '트리케라톱스', stego: '스테고사우루스' };
 
 /* ---------- 할 일 아이콘 (4.1절). 글자 모양 아이콘은 넣지 않음 ---------- */
@@ -5662,8 +5665,8 @@ function greetText() {
   if (!ms.length) return hasAnyPlan() ? '오늘은 쉬는 날이야' : '';
   if (!todo.length) return '오늘 할 일 다 했어! 최고야!';
   if (todo.length === 1) return `오늘은 ${reul(todo[0])} 하자!`;
-  if (todo.length === 2) return `오늘은 ${rang(todo[0])} ${reul(todo[1])} 하자!`;
-  return `오늘은 ${todo[0]}, ${rang(todo[1])} ${reul(todo[2])} 하자!`;
+  const head = todo.slice(0, -2).map(w => w + ', ').join('');   // 3개 이상: "가, 나, 다랑 라를"
+  return `오늘은 ${head}${rang(todo[todo.length - 2])} ${reul(todo[todo.length - 1])} 하자!`;
 }
 
 /* ---------- 바쁨 / 잠자기 ---------- */
@@ -5680,15 +5683,17 @@ function wake() {
   sleeping = false; FRAME_MS = 1000 / TARGET_FPS; document.body.classList.remove('sleep'); anim.jump = 0.001; anim.jumps = 0;
 }
 
-/* ---------- 홈: 오늘 할 일 카드 (최대 3개) ---------- */
+/* ---------- 홈: 오늘 할 일 카드 (최대 5개) ---------- */
 function renderHome() {
   const ms = ensureToday().missions;
   if (!ms.length) {
+    sideEl.style.setProperty('--n', 3);
     sideEl.innerHTML = hasAnyPlan()
       ? `<div class="card rest"><div class="ic" style="background:#E7E4F7">${SVG.moon}</div></div>`
-      : `<div class="card empty"><div class="ic"></div></div><p class="phint">부모님: 왼쪽 위 모서리를 3초 누르면 할 일을 넣을 수 있어요</p>`;
+      : `<div class="card empty"><div class="ic"></div></div><p class="phint">부모님: 왼쪽 위 자물쇠 버튼을 누르면 할 일을 넣을 수 있어요</p>`;
     requestAnimationFrame(resize); return;
   }
+  sideEl.style.setProperty('--n', Math.max(3, ms.length));   // 4~5개면 카드를 작게
   sideEl.innerHTML = ms.map(m => {
     const s = subj(m.sid), done = m.status === 'done';
     return `<div class="card${done ? ' done' : ''}" data-id="${m.id}">
