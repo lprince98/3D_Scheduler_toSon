@@ -76,7 +76,10 @@
     grid-template-columns: 1fr 380px; grid-template-rows: 1fr;
     padding: var(--sat) var(--sar) var(--sab) var(--sal);
   }
-  #stage-area { position: relative; }
+  /* 3D 영역의 빈 상자가 터치를 가로채지 않게: 아래 캔버스(#c)로 넘겨 드래그 회전이 되도록 */
+  #stage-area, #screen-decor > .stage-hole { position: relative; pointer-events: none; }
+  #rot-hint { position: absolute; right: 16px; top: 16px; background: var(--panel); color: rgba(255,255,255,.85); padding: 6px 12px; border-radius: 999px; font-size: 13px; transition: opacity .6s; }
+  #rot-hint.hide { opacity: 0; }
   #tank-label {
     position: absolute; left: 20px; top: 16px; background: var(--panel); color: #fff;
     padding: 8px 14px; border-radius: 12px; font-weight: 700; font-size: 16px;
@@ -382,6 +385,7 @@
   <div id="stage-area">
     <div id="tank-label"><span id="tank-name"></span><small id="tank-sub"></small><span id="stage-chip"></span></div>
     <div id="toast"></div>
+    <div id="rot-hint">👆 옆으로 밀어서 돌리기</div>
   </div>
   <aside id="panel">
     <h2>오늘 미션 <span id="today-str"></span><i class="grow"></i><button id="btn-past">📅 지난 날</button></h2>
@@ -427,7 +431,7 @@
 
 <!-- 꾸미기 (도색·위장·마킹) -->
 <section id="screen-decor" class="screen">
-  <div></div>
+  <div class="stage-hole"></div>
   <aside id="decor-panel">
     <h2 id="decor-title">꾸미기</h2>
     <div class="dsec" id="dsec-base"><h3>기본 도색 <span></span></h3><div class="swatches"></div></div>
@@ -937,7 +941,7 @@ function applyAttached() {
 let dragging = false, lastX = 0, velocity = 0;
 function bindCanvas(c) {
   c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; velocity = 0; c.setPointerCapture(e.pointerId); });
-  c.addEventListener('pointermove', e => { if (!dragging) return; const dx = e.clientX - lastX; lastX = e.clientX; velocity = dx * 0.008; tank.rotation.y += velocity; });
+  c.addEventListener('pointermove', e => { if (!dragging) return; const dx = e.clientX - lastX; lastX = e.clientX; velocity = dx * 0.008; tank.rotation.y += velocity; if (Math.abs(dx) > 2) $('#rot-hint').classList.add('hide'); });
   c.addEventListener('pointerup', () => dragging = false);
   c.addEventListener('pointercancel', () => dragging = false);
 }
