@@ -80,6 +80,8 @@
   #stage-area, #screen-decor > .stage-hole { position: relative; pointer-events: none; }
   #rot-hint { position: absolute; right: 16px; top: 16px; background: var(--panel); color: rgba(255,255,255,.85); padding: 6px 12px; border-radius: 999px; font-size: 13px; transition: opacity .6s; }
   #rot-hint.hide { opacity: 0; }
+  #rot-hint.fire, #decor-hint.fire { background: rgba(255,212,71,.92); color: var(--ink); font-weight: 700; }
+  #decor-hint { position: absolute; right: 16px; top: 16px; background: var(--panel); color: rgba(255,255,255,.85); padding: 6px 12px; border-radius: 999px; font-size: 13px; }
   #tank-label {
     position: absolute; left: 20px; top: 16px; background: var(--panel); color: #fff;
     padding: 8px 14px; border-radius: 12px; font-weight: 700; font-size: 16px;
@@ -255,6 +257,7 @@
   #cere-sub { color: #fff; font-size: 20px; text-align: center; opacity: .9; }
   #cere-bottom { display: flex; gap: 12px; align-items: flex-end; width: 100%; justify-content: center; }
   @media (orientation: landscape) { #screen-cere.on { align-items: stretch; } #cere-bottom { justify-content: flex-end; } #cere-bottom:has(#spec-card:not(.on)) { justify-content: center; } }
+  #cere-bottom { pointer-events: none; } #cere-bottom > * { pointer-events: auto; }   /* 제원 카드 옆 빈 곳을 톡 → 발사 */
   #spec-card { background: var(--card); border-radius: 20px; padding: 18px 22px; width: min(92vw, 520px); box-shadow: 0 10px 40px rgba(0,0,0,.4); display: none; }
   #spec-card.on { display: block; }
   #spec-card h2 { margin: 0 0 4px; font-size: 26px; }
@@ -385,7 +388,7 @@
   <div id="stage-area">
     <div id="tank-label"><span id="tank-name"></span><small id="tank-sub"></small><span id="stage-chip"></span></div>
     <div id="toast"></div>
-    <div id="rot-hint">👆 옆으로 밀어서 돌리기</div>
+    <div id="rot-hint">👆 밀면 돌고, 톡 치면 들썩</div>
   </div>
   <aside id="panel">
     <h2>오늘 미션 <span id="today-str"></span><i class="grow"></i><button id="btn-past">📅 지난 날</button></h2>
@@ -431,7 +434,7 @@
 
 <!-- 꾸미기 (도색·위장·마킹) -->
 <section id="screen-decor" class="screen">
-  <div class="stage-hole"></div>
+  <div class="stage-hole"><div id="decor-hint">👆 밀면 돌고, 톡 치면 들썩</div></div>
   <aside id="decor-panel">
     <h2 id="decor-title">꾸미기</h2>
     <div class="dsec" id="dsec-base"><h3>기본 도색 <span></span></h3><div class="swatches"></div></div>
@@ -898,6 +901,7 @@ const ctx = {
 const partObjects = new Map();   // id -> { obj, part, target(Vector3) }
 const anims = [];
 function buildTank(parts) {
+  { if (fx.fire >= 0) turret.rotation.y = fx.aimBase; if (fx.swing >= 0) turret.rotation.y = fx.swingBase; fx.hop = fx.swing = fx.fire = -1; fx.recoil = []; flashMesh.visible = false; tank.position.y = 0; tank.rotation.z = 0; }
   for (const v of partObjects.values()) v.obj.parent.remove(v.obj);
   partObjects.clear();
   for (const p of parts) {
@@ -938,15 +942,122 @@ function applyAttached() {
 }
 
 // ---- 입력: 캔버스 위 드래그로 Y축 회전만 ----
-let dragging = false, lastX = 0, velocity = 0;
+let dragging = false, lastX = 0, velocity = 0, tapStart = null;
 function bindCanvas(c) {
-  c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; velocity = 0; c.setPointerCapture(e.pointerId); });
-  c.addEventListener('pointermove', e => { if (!dragging) return; const dx = e.clientX - lastX; lastX = e.clientX; velocity = dx * 0.008; tank.rotation.y += velocity; if (Math.abs(dx) > 2) $('#rot-hint').classList.add('hide'); });
+  c.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; velocity = 0; c.setPointerCapture(e.pointerId); tapStart = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  // 거의 안 움직이고 짧게 누르면 "톡" (밀어서 돌리기와 구분)
+  c.addEventListener('pointerup', e => { const t = tapStart; tapStart = null; if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 10 && performance.now() - t.t < 400) onTankTap(); });
+  c.addEventListener('pointermove', e => { if (!dragging) return; const dx = e.clientX - lastX; lastX = e.clientX; velocity = dx * 0.008; tank.rotation.y += velocity; if (Math.abs(dx) > 2 && !$('#rot-hint').classList.contains('fire')) $('#rot-hint').classList.add('hide'); });
   c.addEventListener('pointerup', () => dragging = false);
   c.addEventListener('pointercancel', () => dragging = false);
 }
 bindCanvas(canvas);
 document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---- 톡 치기: 조립 중에는 차체가 들썩 + 포탑이 좌우로, 완성한 전차는 주포 발사 ----
+const fx = { hop: -1, swing: -1, swingBase: 0, fire: -1, recoil: [], cool: 0, shot: false, aimFrom: 0, aimTo: 0, aimBase: 0 };
+const AIM = 0.4;                                            // 조준(포탑 돌리기)에 걸리는 시간
+// 완성 = 완성 검수까지 끝남 / 완성 연출의 제원 카드 / 차고 목록에서 연 완성 전차
+function canFire() {
+  const g = partObjects.get('gun'); if (!g || !g.obj.visible) return false;
+  return !!viewBackup || (cere && cere.phase === 'card') || state.build.finish.length >= FINISH_STEPS.length;
+}
+const tapScreenOn = () => ['garage', 'decor', 'cere'].some(k => screens[k].classList.contains('on'));
+function onTankTap() {
+  if (!tapScreenOn() || anims.length) return;              // 부품이 날아오는 중에는 무시
+  if (cere && cere.phase !== 'card') return;               // 시운전 중에는 무시
+  if (canFire()) { fireGun(); return; }
+  if (fx.hop >= 0 || fx.fire >= 0) return;
+  fx.hop = 0; fx.swing = 0; fx.swingBase = turret.rotation.y; sfx.bump();
+}
+// 포구 불꽃(포탑에 붙음)과 연기(장면에 붙음) — 미리 만들어 두고 재사용
+const flashMat = new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+const flashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), flashMat);
+const flashCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), new THREE.MeshBasicMaterial({ color: 0xfff6d0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+flashMesh.add(flashCore); flashMesh.visible = false; turret.add(flashMesh);
+const MUZZLE_TIP = new THREE.Vector3(4.2, 0.40, 0);          // 포탑 기준 머즐 브레이크 끝
+const puffGeo = new THREE.IcosahedronGeometry(0.32, 1);
+const puffs = Array.from({ length: 10 }, () => {
+  const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xd8d2c4, transparent: true, opacity: 0, depthWrite: false }));
+  m.visible = false; scene.add(m); return { m, vel: new THREE.Vector3(), t: -1 };
+});
+function fireGun() {
+  const now = performance.now(); if (now < fx.cool || fx.fire >= 0) return;
+  fx.cool = now + 2100;                                     // 조준 + 발사 + 제자리 (장전 시간)
+  if (fx.swing >= 0) turret.rotation.y = fx.swingBase;
+  fx.hop = -1; fx.swing = -1; tank.position.y = 0; tank.rotation.z = 0;
+  // 화면의 빈 쪽(앞-왼쪽)으로 포탑을 돌려 조준: 불꽃·연기가 오른쪽 패널에 가리지 않게
+  // 카메라 기준으로 계산: 보는 사람 쪽(살짝 왼쪽) 방향을 전차(포탑의 부모) 좌표로 바꿔 포탑 각도를 구함
+  camera.updateMatrixWorld(); tank.updateMatrixWorld(true);
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
+  const toward = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2).setY(0).normalize();   // 카메라 뒤쪽 = 보는 사람 쪽
+  const aimW = toward.addScaledVector(right, -0.35).normalize();   // 거의 보는 사람 쪽, 살짝 왼쪽
+  const o = tank.worldToLocal(turret.getWorldPosition(new THREE.Vector3())), q = tank.worldToLocal(turret.getWorldPosition(new THREE.Vector3()).add(aimW)).sub(o);
+  const want = Math.atan2(-q.z, q.x);                        // 포신 = 포탑 로컬 +X
+  let d = want - turret.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));   // 가까운 쪽으로
+  fx.aimBase = fx.aimFrom = turret.rotation.y; fx.aimTo = turret.rotation.y + d;
+  fx.fire = 0; fx.shot = false; sfx.tick();
+}
+function shoot() {
+  fx.shot = true;
+  fx.recoil = ['gun', 'muzzle'].map(id => partObjects.get(id)).filter(v => v && v.obj.visible);
+  flashMesh.position.set(MUZZLE_TIP.x + 0.55, MUZZLE_TIP.y, 0); flashMesh.visible = true;
+  turret.updateMatrixWorld(true);
+  const tip = turret.localToWorld(MUZZLE_TIP.clone()), dir = turret.localToWorld(MUZZLE_TIP.clone().add(new THREE.Vector3(1, 0, 0))).sub(tip).normalize();
+  puffs.forEach(p => {
+    p.t = 0; p.m.visible = true; p.m.position.copy(tip); p.m.scale.setScalar(0.3);
+    p.vel.copy(dir).multiplyScalar(1.2 + Math.random() * 2.2).add(new THREE.Vector3((Math.random() - .5) * 1.6, 0.2 + Math.random() * 0.9, (Math.random() - .5) * 1.6));
+  });
+  sfx.boom();
+  const st = $('#stage-area'); st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash');
+}
+function stepTap(dt) {
+  if (fx.hop >= 0) {                                        // 폴짝 → 작게 한 번 더 → 멈춤, 앞뒤로 흔들
+    const t = fx.hop += dt;
+    if (t >= 0.6) { fx.hop = -1; tank.position.y = 0; tank.rotation.z = 0; }
+    else {
+      tank.position.y = t < 0.34 ? Math.sin(Math.PI * t / 0.34) * 0.32 : Math.sin(Math.PI * Math.min(1, (t - 0.34) / 0.2)) * 0.07;
+      tank.rotation.z = Math.sin(t * 20) * 0.045 * (1 - t / 0.6);
+    }
+  }
+  if (fx.swing >= 0) {                                      // 포탑이 좌우로 두리번
+    const t = fx.swing += dt, k = t / 1.1;
+    if (k >= 1) { fx.swing = -1; turret.rotation.y = fx.swingBase; }
+    else turret.rotation.y = fx.swingBase + Math.sin(k * Math.PI * 2) * 0.5 * (1 - k);
+  }
+  if (fx.fire >= 0) {
+    const T = fx.fire += dt, ease = k => k * k * (3 - 2 * k);
+    if (T < AIM) { turret.rotation.y = fx.aimFrom + (fx.aimTo - fx.aimFrom) * ease(T / AIM); return stepPuffs(dt); }
+    if (!fx.shot) { turret.rotation.y = fx.aimTo; shoot(); }
+    const t = T - AIM;
+    if (t > 1.0) turret.rotation.y = fx.aimTo + (fx.aimBase - fx.aimTo) * ease(Math.min(1, (t - 1.0) / 0.5));   // 제자리로
+    // 주포가 뒤로 확 밀렸다가 천천히 제자리로
+    const back = t < 0.05 ? t / 0.05 : Math.max(0, 1 - (t - 0.05) / 0.5);
+    fx.recoil.forEach(v => { v.obj.position.x = v.target.x - 0.45 * (back * back * (3 - 2 * back)); });
+    tank.rotation.z = Math.sin(t * 16) * 0.07 * Math.exp(-t * 4.5);   // 반동으로 차체가 앞뒤로 출렁
+    if (t < 0.14) { const k = t / 0.14; flashMesh.scale.set(1.6 + k * 1.6, 0.7 + k * 0.5, 0.7 + k * 0.5); flashMat.opacity = 1 - k; flashCore.material.opacity = 1 - k; }
+    else flashMesh.visible = false;
+    if (t >= 1.55) { fx.fire = -1; tank.rotation.z = 0; turret.rotation.y = fx.aimBase; fx.recoil.forEach(v => v.obj.position.x = v.target.x); flashMesh.visible = false; }
+  }
+  stepPuffs(dt);
+}
+function stepPuffs(dt) {
+  for (const p of puffs) {                                  // 연기: 앞으로 퍼지며 느려지고, 커지면서 옅어짐
+    if (p.t < 0) continue;
+    p.t += dt;
+    if (p.t >= 1.6) { p.t = -1; p.m.visible = false; continue; }
+    p.m.position.addScaledVector(p.vel, dt); p.vel.multiplyScalar(Math.pow(0.12, dt)); p.vel.y += 0.35 * dt;
+    p.m.scale.setScalar(0.3 + p.t * 1.3); p.m.material.opacity = 0.6 * (1 - p.t / 1.6);
+  }
+}
+// 안내 문구: 완성한 전차면 "톡 치면 발사!"
+function updateTapHints() {
+  try {
+    const f = canFire();
+    const r = $('#rot-hint'); r.textContent = f ? '💥 톡 치면 발사!' : '👆 밀면 돌고, 톡 치면 들썩'; r.classList.toggle('fire', f); if (f) r.classList.remove('hide');
+    const d = $('#decor-hint'); d.textContent = f ? '💥 톡 치면 발사! · 밀면 돌기' : '👆 밀면 돌고, 톡 치면 들썩'; d.classList.toggle('fire', f);
+  } catch {}
+}
 
 // ---- 리사이즈: 가로면 전차를 왼쪽, 세로면 위쪽에 두기 위해 뷰 오프셋 사용 ----
 let layoutCenter = false;
@@ -1003,7 +1114,7 @@ function loop(now) {
   if (now - last < frameInterval - 1) return;
   const dt = Math.min(0.1, (now - prev) / 1000); prev = now; last = now;
   if (!dragging && Math.abs(velocity) > 0.0005) { tank.rotation.y += velocity; velocity *= 0.92; }
-  stepAnims(dt); stepCeremony(dt);
+  stepAnims(dt); stepCeremony(dt); stepTap(dt);
   renderer.render(scene, camera);
   frames++;
   if (now - fpsTime >= 1000) {
@@ -1063,6 +1174,27 @@ const sfx = (() => {
       [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.5, 'sine', 0.15, i * 0.13));
     },
     tick() { if (ready()) tone(1200, 0.04, 'sine', 0.05); },
+    bump() {                                             // 톡: 쿵 하고 들썩
+      vibrate(25);
+      if (!ready()) return;
+      tone(150, 0.14, 'square', 0.07, 0, 70); noise(0.06, 0.12, 0, 900);
+    },
+    boom() {                                             // 발사: 날카로운 폭음 + 낮은 쿵 + 메아리
+      vibrate([90, 40, 160]);
+      if (!ready()) return;
+      const lp = (dur, gain, t0, cut) => {
+        const t = ac.currentTime + t0, n = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.6);
+        const src = ac.createBufferSource(); src.buffer = buf;
+        const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
+        const g = ac.createGain(); g.gain.value = gain;
+        src.connect(f).connect(g).connect(ac.destination); src.start(t);
+      };
+      noise(0.1, 0.35, 0, 2500);
+      lp(0.9, 0.9, 0, 500);
+      tone(95, 0.6, 'sine', 0.45, 0, 32);
+      lp(0.7, 0.18, 0.28, 300);
+    },
   };
 })();
 
@@ -1089,6 +1221,7 @@ const screens = { select: $('#screen-select'), garage: $('#screen-garage'), focu
   decor: $('#screen-decor'), list: $('#screen-list'), cere: $('#screen-cere') };
 function show(name) {
   for (const k in screens) screens[k].classList.toggle('on', k === name);
+  if (name === 'garage' || name === 'decor') updateTapHints();
   const threeD = ['garage', 'select', 'decor', 'cere'].includes(name);   // 그 외 화면에서는 렌더링 정지
   layoutCenter = name === 'cere';
   if (threeD && !renderOn) { canvas.style.display = ''; renderOn = true; prev = performance.now(); resize(); }
@@ -1179,6 +1312,7 @@ function renderGarage() {
   else { const f = FINISH_STEPS[b.finish.length]; txt = f ? `마감 ${b.finish.length}/${FINISH_STEPS.length} · 다음: ${f.name}` : '마감 완료 · 주말에 완성!'; }
   $('#parts-count').textContent = txt + (grey ? ` · 회색 ${grey}개` : '');
   $('#btn-decor').disabled = !state.build.finish.length && !state.garage.length;
+  updateTapHints();
 }
 // 현재 단계에서 붙일 수 있는 다음 부품 (단계 잠금)
 function nextPart() {
