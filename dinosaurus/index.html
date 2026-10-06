@@ -98,6 +98,14 @@
   @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.4); } 100% { transform: scale(1); } }
   body.awake #bar { background: rgba(255,255,255,.7); }
   body.awake .slot.on path { fill: #FFE08A; }
+  /* 자라기 칸: 작은 공룡 → 큰 공룡 (글자 없음) */
+  #bar .grow { display: none; align-items: flex-end; gap: 10px; height: 60px; }
+  body.growing #bar .slot { display: none; }
+  body.growing #bar .grow { display: flex; }
+  .gs { width: calc(72px * var(--s)); height: calc(60px * var(--s)); }
+  .gs svg { width: 100%; height: 100%; display: block; }
+  .gs:not(.on) { opacity: .55; }
+  .gs.pop { animation: pop .7s; }
 
   /* 손가락 안내 */
   #hand { position: fixed; left: 0; top: 0; width: 96px; height: 96px; margin: -6px 0 0 -31px;
@@ -4624,7 +4632,7 @@ function defaultState() {
   return {
     version: 1,
     settings: { quality: 'low', showStats: false, sound: true, voice: true, placeMode: 'drag', sleep: true, sleepMin: 3,
-      defaultMin: 10, confirmMode: 'math', skipAwaken: false, pinHash: null, names: ['쿵쿵이', '초롱이', '방울이', '튼튼이', '콩콩이', '뿌뿌'] },
+      defaultMin: 10, confirmMode: 'math', skipAwaken: false, growSteps: 4, pinHash: null, names: ['쿵쿵이', '초롱이', '방울이', '튼튼이', '콩콩이', '뿌뿌'] },
     dino: { kind: 'trex', placed: 0, awake: false, pending: 0, inPlay: false, giftGiven: false, color: null, name: '', look: null, chosen: false, doneAt: '', thumb: '' },
     focus: null,
     subjects: DEFAULT_SUBJECTS.map(s => ({ ...s })),
@@ -5397,9 +5405,18 @@ function applyLook(kind, look) {
 }
 useKind(state.dino.kind);
 
+/* ---------- 자라기: 깨어나면 아기 공룡 → 할 일마다 쑥 자라서 다 큰 공룡 ---------- */
+const BABY = 0.6;                                             // 아기 크기 (다 큰 공룡 = 1)
+const growSteps = () => state.settings.growSteps ?? 4;        // 0이면 자라기 없음 (예전처럼)
+const growOf = d => d.grow ?? Infinity;                       // 자라기 전에 저장된 공룡은 다 큰 것으로
+const sizeOf = d => { const n = growSteps(); return !d.awake || !n ? 1 : BABY + (1 - BABY) * Math.min(1, growOf(d) / n); };
+let growAnim = null;                                          // { from, to, t, done }
+const setSize = (sz, kind = curKind) => models[kind].group.scale.setScalar(sz);
+
 function setGhostMat(p, mat) { p.ghost.traverse(o => { if (o.isMesh) o.material = mat; }); }
 function applyVisibility() {
   useKind(state.dino.kind); applyLook(curKind, lookOf(state.dino));
+  if (!growAnim && phase !== 'awaken') setSize(sizeOf(state.dino));
   const { placed, awake } = state.dino;
   pieces.forEach((p, i) => {
     p.bone.visible = !awake && i < placed;
@@ -5427,8 +5444,16 @@ const BONE_PATH = 'M20.93 28 H43.07 A8 8 0 1 1 50 32 A8 8 0 1 1 43.07 36 H20.93 
 $('bar').innerHTML = Array.from({ length: PIECE_COUNT }, () =>
   `<div class="slot"><svg viewBox="0 0 64 64"><path d="${BONE_PATH}" transform="rotate(-35 32 32)"/></svg></div>`).join('');
 const slotEls = [...document.querySelectorAll('.slot')];
-function updateBar(popIdx = -1) {
+$('bar').insertAdjacentHTML('beforeend', '<div class="grow" id="growRow"></div>');   // 깨어난 뒤: 작은 공룡 → 큰 공룡 칸
+function updateBar(popIdx = -1, growPop = -1) {
   const { placed, awake } = state.dino;
+  const n = growSteps(), showGrow = awake && n > 0, g = Math.min(growOf(state.dino), n);
+  document.body.classList.toggle('growing', showGrow);
+  if (showGrow) {
+    const c = lookOf(state.dino).body;
+    $('growRow').innerHTML = Array.from({ length: n }, (_, i) =>
+      `<span class="gs${i < g ? ' on' : ''}${i === growPop ? ' pop' : ''}" style="--s:${(0.5 + 0.5 * (i + 1) / n).toFixed(2)}">${SVG.dino(i < g ? c : '#d9cbb0')}</span>`).join('');
+  }
   slotEls.forEach((el, i) => {
     el.classList.toggle('on', awake || i < placed);
     el.classList.toggle('next', !awake && i === placed);
@@ -5738,6 +5763,7 @@ function updateAwaken(dt) {
   M.bone.emissive.setScalar(t < 1.2 ? t / 1.2 * 0.5 : Math.max(0, 0.5 - (t - 1.2)));
   if (t >= 1.2 && !aw.skinOn) { aw.skinOn = true; pieces.forEach(p => { p.skin.visible = true; }); }
   if (aw.skinOn) clipPlane.constant = t < 3.2 ? (t - 1.2) / 2 * 3.2 : 100;   // 피부가 아래→위
+  if (growSteps()) setSize(1 - (1 - BABY) * clamp((t - 2.2) / 1.0, 0, 1));   // 빛 속에서 아기 공룡으로
   if (t >= 3.2) pieces.forEach(p => { p.bone.visible = false; });
   if (t >= 3.4 && t < 3.6) anim.blink = 0.15;
   const st = clamp((t - 3.7) / 0.6, 0, 1); rig.scale.y = 1 + Math.sin(st * Math.PI) * 0.08;   // 기지개
@@ -5747,7 +5773,7 @@ function updateAwaken(dt) {
   scene.background.copy(SAND_BG).lerp(GRASS_BG, k); groundMat.color.copy(SAND_GROUND).lerp(GRASS_GROUND, k);
   if (t >= 6.2) {
     pillar.visible = false; M.bone.emissive.setScalar(0); rig.scale.y = 1;
-    state.dino.awake = true; state.dino.inPlay = false; state.dino.doneAt = todayKey(); save();
+    state.dino.awake = true; state.dino.grow = 0; state.dino.inPlay = false; state.dino.doneAt = todayKey(); save();
     phase = 'idle'; aw.jumped = false; applyVisibility(); poke(); bodyBusy();
     setTimeout(openDeco, 1200);                      // 꾸미기 → 이름 → (오늘 다 했으면) 축하
   }
@@ -5757,6 +5783,7 @@ function updateAwaken(dt) {
 let time = 0;
 function update(dt, now) {
   time += dt;
+  stepGrow(dt);
   if (!ptr.id || ptr.mode !== 'rotate') { userYaw += spinVel * dt; spinVel *= Math.pow(0.02, dt); }
   root.rotation.y = userYaw;
 
@@ -6105,12 +6132,40 @@ function completeMission(m) {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && doingOpen) { keepAwake(); tickFocus(); } });
 function missionDone(color) {
-  if (phase !== 'idle' || decoOn) { state.dino.pending++; save(); return; }
+  if (phase !== 'idle' || decoOn || growAnim) { state.dino.pending++; save(); return; }
+  if (state.dino.awake && growOf(state.dino) < growSteps()) { growUp(); return; }   // 아기 공룡이면 쑥 자람
   if (state.dino.awake) { newDino(() => setTimeout(() => spawnRock(color), 700)); return; }
   setTimeout(() => spawnRock(color), 450);
 }
+function growUp() {
+  const d = state.dino, from = sizeOf(d);
+  d.grow = Math.min(growOf(d), growSteps()) + 1; save();
+  const done = d.grow >= growSteps();
+  growAnim = { from, to: sizeOf(d), t: 0, done };
+  pillar.visible = true; pillar.material.opacity = 0;
+  sfx('sparkle'); buzz(60); updateBar(-1, d.grow - 1); wake(); poke();
+  guide(done ? '다 컸어! 최고야!' : '쑥쑥 자랐어!');
+}
+function stepGrow(dt) {
+  const g = growAnim; if (!g) return;
+  g.t += dt; const k = Math.min(1, g.t / 1.1), e = 1 - Math.pow(1 - k, 3);
+  pillar.material.opacity = Math.sin(k * Math.PI) * 0.35; pillar.rotation.y += dt * 0.8;
+  setSize(g.from + (g.to - g.from) * e + Math.sin(k * Math.PI) * 0.05);   // 쑥 커지면서 살짝 통통
+  if (k < 1) return;
+  growAnim = null; pillar.visible = false; setSize(sizeOf(state.dino));
+  anim.jump = 0.001; anim.jumps = g.done ? 2 : 1;
+  if (g.done) {                                            // 다 컸으면 크앙 + 공원 사진을 다 큰 모습으로
+    anim.jaw = 0.8; sfx('roar');
+    state.dino.thumb = capture(curKind, lookOf(state.dino)); save();
+  }
+  setTimeout(() => {
+    if (state.dino.pending > 0) { state.dino.pending--; save(); missionDone(); }   // 그 사이 끝낸 할 일
+    else maybeCheer();
+  }, 1200);
+}
 // 진행 중인 바위·뼈·연출을 치움 (부모 테스트, 새 공룡)
 function clearPlay() {
+  if (growAnim) { growAnim = null; pillar.visible = false; }
   if (fl.obj) { scene.remove(fl.obj); fl.obj = null; }
   rock.mesh.visible = false; rockShadow.visible = false; pillar.visible = false; M.bone.emissive.setScalar(0);
   phase = 'idle'; hideHand(true); rig.scale.y = 1; bodyBusy();
@@ -6159,6 +6214,7 @@ function capture(kind, look) {
   const keep = { kind: curKind, bg: scene.background.clone(), gr: groundMat.color.clone(), ry: root.rotation.y, py: rig.position.y, rz: rig.rotation.z, sy: rig.scale.y, clip: clipPlane.constant };
   const hidden = [rock.mesh, rockShadow, pillar, fl.obj, ...frags.map(f => f.m)].filter(o => o && o.visible); hidden.forEach(o => { o.visible = false; });
   useKind(kind);
+  const keepSize = models[kind].group.scale.x; setSize(1, kind);   // 사진은 늘 다 큰 모습
   const vis = pieces.map(p => [p.bone.visible, p.ghost.visible, p.skin.visible]);
   pieces.forEach(p => { p.bone.visible = false; p.ghost.visible = false; p.skin.visible = true; p.holder.rotation.set(0, 0, 0); });
   applyLook(kind, look); eyes.forEach(g => { g.scale.y = 1; });
@@ -6170,6 +6226,7 @@ function capture(kind, look) {
   for (let y = 0; y < CAP_H; y++) img.data.set(buf.subarray((CAP_H - 1 - y) * CAP_W * 4, (CAP_H - y) * CAP_W * 4), y * CAP_W * 4);   // 위아래 뒤집기
   x.putImageData(img, 0, 0);
   pieces.forEach((p, i) => { [p.bone.visible, p.ghost.visible, p.skin.visible] = vis[i]; });
+  setSize(keepSize, kind);
   useKind(keep.kind); applyLook(keep.kind, viewing ? viewing.look : lookOf(state.dino));
   scene.background.copy(keep.bg); groundMat.color.copy(keep.gr);
   root.rotation.y = keep.ry; rig.position.y = keep.py; rig.rotation.z = keep.rz; rig.scale.y = keep.sy; clipPlane.constant = keep.clip;
@@ -6308,6 +6365,7 @@ function startView(p) {
   viewing = { ...p, look: { ...DEFAULT_LOOK[p.kind], ...(p.look || {}) } };
   phase = 'view'; document.body.classList.add('viewing'); bodyBusy();
   useKind(p.kind); pieces.forEach(q => { q.bone.visible = false; q.ghost.visible = false; q.skin.visible = true; });
+  setSize(p.current ? sizeOf(state.dino) : 1);                 // 공원 공룡은 다 큰 모습, 지금 공룡은 지금 크기
   applyLook(p.kind, viewing.look); scene.background.copy(GRASS_BG); groundMat.color.copy(GRASS_GROUND);
   requestAnimationFrame(resize);
   start(); anim.jump = 0.001; anim.jumps = 0; sfx('roarSmall');
@@ -6590,7 +6648,7 @@ function tabStats() {
   h += `<h3>할 일별 최근 4주</h3><table class="grid"><tr><th>할 일</th><th>3주 전</th><th>2주 전</th><th>지난주</th><th>이번 주</th></tr>
     ${state.subjects.map(s => `<tr><td style="text-align:left"><span class="mini" style="display:inline-block;vertical-align:middle">${ICON[s.icon](s.color)}</span> ${esc(s.name)}</td>${weeks.map(w => `<td>${pct(rate(w, s.id))}</td>`).join('')}</tr>`).join('')}</table>`;
   const L = state.log, tot = L.placeSelf + L.placeAuto, month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-  h += `<h3>공룡</h3><div class="out">지금 공룡: ${DINO_NAME[state.dino.kind] || state.dino.kind}${state.dino.name ? ` "${esc(state.dino.name)}"` : ''} · 뼈 ${state.dino.placed}/${PIECE_COUNT}${state.dino.awake ? ' · 깨어남' : ''}
+  h += `<h3>공룡</h3><div class="out">지금 공룡: ${DINO_NAME[state.dino.kind] || state.dino.kind}${state.dino.name ? ` "${esc(state.dino.name)}"` : ''} · 뼈 ${state.dino.placed}/${PIECE_COUNT}${state.dino.awake ? ` · 깨어남${growSteps() ? ` · 자람 ${Math.min(growOf(state.dino), growSteps())}/${growSteps()}` : ''}` : ''}
 완성한 공룡: 모두 ${state.park.length}마리 · 이번 달 ${state.park.filter(p => (p.doneAt || '').startsWith(month)).length}마리
 뼈 붙이기: 스스로 ${L.placeSelf}번 / 자동 ${L.placeAuto}번${tot ? ` (스스로 ${Math.round(L.placeSelf / tot * 100)}%)` : ''}
 바위 깨기: 스스로 ${L.rockSelf}번 / 자동 ${L.rockAuto}번</div>`;
@@ -6607,6 +6665,8 @@ function tabSet() {
     <p class="note">형이 대신 풀어 주는 일이 있으면 비밀번호로 바꾸세요.</p>
   <h3>뼈 붙이기</h3><div class="row"><button class="${sel(s.placeMode === 'drag')}" data-a="pm" data-v="drag">끌어다 놓기</button><button class="${sel(s.placeMode === 'tap')}" data-a="pm" data-v="tap">누르면 날아가 붙기</button>
     <button class="${sel(s.skipAwaken)}" data-a="skipAw">깨어남 연출 짧게${s.skipAwaken ? ' 켬' : ''}</button></div>
+  <h3>자라기</h3><div class="row">${[0, 2, 4, 6].map(v => `<button class="${sel(growSteps() === v)}" data-a="grow" data-v="${v}">${v ? v + '번' : '끔'}</button>`).join('')}</div>
+    <p class="note">깨어난 공룡은 아기로 시작해 할 일을 이 횟수만큼 더 하면 다 큰 공룡이 되고, 그다음 할 일에서 공원으로 갑니다. 한 마리 = 뼈 8개 + 자라기 횟수.</p>
   <h3>소리</h3><div class="row"><button class="${sel(s.sound)}" data-a="sound">효과음 ${s.sound ? '켜짐' : '꺼짐'}</button><button class="${sel(s.voice)}" data-a="voice">안내 목소리 ${s.voice ? '켜짐' : '꺼짐'}</button></div>
   <h3>이름 카드</h3><p class="note">공룡이 깨어나면 아이가 고르는 이름 (그림 카드를 누르면 소리로 들림). 쉼표로 구분, 6개.</p>
     <div class="row"><input type="text" id="namesIn" value="${esc(s.names.join(', '))}" style="flex:1;min-width:240px;font-size:16px;padding:10px;border-radius:10px;border:1px solid #d8c9ad"><button data-a="names">저장</button></div>
@@ -6618,7 +6678,7 @@ function tabSet() {
 
 /* --- 테스트·초기화 --- */
 function tabTest() {
-  return `<h3>뼈·공룡</h3><div class="row"><button class="pri" data-a="give">뼈 1개 주기</button><button data-a="last">7개 채우고 마지막 1개</button><button data-a="wakePrev">깨어남 연출 보기</button><button data-a="dinoReset">지금 공룡 처음부터</button></div>
+  return `<h3>뼈·공룡</h3><div class="row"><button class="pri" data-a="give">뼈 1개 주기</button><button data-a="last">7개 채우고 마지막 1개</button><button data-a="wakePrev">깨어남 연출 보기</button><button data-a="growTest">자라기 1번</button><button data-a="dinoReset">지금 공룡 처음부터</button></div>
   <h3>오늘</h3><div class="row"><button data-a="todayReset">오늘 할 일 다시 만들기</button><button data-a="sleepNow">지금 재우기</button><button data-a="logReset">아이 기록 지우기</button></div>
   <h3>읽어주기 (음성 합성) 테스트</h3><p class="note">① 인터넷이 켜진 상태에서 한 번, ② 와이파이를 끄고 한 번 더. 둘 다 소리가 나면 오프라인 읽어주기가 됩니다.</p>
   <div class="row"><button class="pri" data-a="tts">"양치하자!" 읽어 보기</button></div><div class="out" id="tOut">아직 테스트하지 않았습니다.</div>
@@ -6715,6 +6775,7 @@ $('pbody').addEventListener('click', async e => {
   if (a === 'cm') S.confirmMode = t.dataset.v;
   if (a === 'pm') S.placeMode = t.dataset.v;
   if (a === 'skipAw') S.skipAwaken = !S.skipAwaken;
+  if (a === 'grow') { S.growSteps = +t.dataset.v; save(); applyVisibility(); }
   if (a === 'sound') S.sound = !S.sound;
   if (a === 'voice') S.voice = !S.voice;
   if (a === 'stats') { S.showStats = !S.showStats; statsEl.classList.toggle('hidden', !S.showStats); }
@@ -6724,6 +6785,7 @@ $('pbody').addEventListener('click', async e => {
   // 테스트
   if (a === 'give') { closeParent(); if (phase === 'idle' && !decoOn) { if (state.dino.awake) newDino(() => setTimeout(() => spawnRock(), 700)); else setTimeout(() => spawnRock(), 350); } else { state.dino.pending++; save(); } return; }
   if (a === 'last') { clearPlay(); Object.assign(state.dino, { placed: PIECE_COUNT - 1, awake: false, pending: 0, inPlay: false }); save(); applyVisibility(); closeParent(); setTimeout(() => spawnRock(), 350); return; }
+  if (a === 'growTest') { if (!state.dino.awake) pv.msg = '깨어난 공룡이 있을 때만 됩니다.'; else { closeParent(); setTimeout(() => missionDone(), 300); return; } }
   if (a === 'wakePrev') { clearPlay(); Object.assign(state.dino, { placed: PIECE_COUNT, awake: false, pending: 0, inPlay: false }); save(); applyVisibility(); closeParent(); setTimeout(startAwaken, 350); return; }
   if (a === 'dinoReset') { clearPlay(); Object.assign(state.dino, { placed: 0, awake: false, pending: 0, inPlay: false }); save(); applyVisibility(); pv.msg = '지금 공룡을 뼈 0개로 돌렸어요.'; }
   if (a === 'todayReset') { const day = ensureToday(); day.missions = []; delete state.days[todayKey()]; ensureToday(); pv.msg = '오늘 할 일을 일정대로 다시 만들었어요.'; }
@@ -6770,7 +6832,7 @@ if (state.focus) { const m = findMission(state.focus.mid); if (m && m.status ===
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(() => {});
 
 // 확인용 (브라우저 콘솔)
-window.__dino = { rock, camera, renderer, useKind: k => { state.dino.kind = k; applyVisibility(); }, openPark, capture, chooseDino, state: () => state, phase: () => phase, sleeping: () => sleeping, poke: t => { lastBusy = t; }, spawnRock, startAwaken, toScreen, ROCK_POS, floatCenterWorld: () => fl.obj && floatCenterWorld(), slotCenterWorld,
+window.__dino = { size: () => +models[curKind].group.scale.x.toFixed(3), growing: () => !!growAnim, rock, camera, renderer, useKind: k => { state.dino.kind = k; applyVisibility(); }, openPark, capture, chooseDino, state: () => state, phase: () => phase, sleeping: () => sleeping, poke: t => { lastBusy = t; }, spawnRock, startAwaken, toScreen, ROCK_POS, floatCenterWorld: () => fl.obj && floatCenterWorld(), slotCenterWorld,
   tris: () => { const all = o => { let n = o.isMesh ? (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 : 0; o.children.forEach(c => n += all(c)); return n; };
     return Object.fromEntries(KINDS.map(k => { const ps = models[k].pieces; return [k, { bone: ps.reduce((n, p) => n + all(p.bone), 0), skin: ps.reduce((n, p) => n + all(p.skin), 0) }]; })); } };
 })();
