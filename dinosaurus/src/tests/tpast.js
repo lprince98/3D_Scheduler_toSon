@@ -1,0 +1,32 @@
+const { chromium } = require('playwright');
+const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.goto('http://localhost:8765/index.html'); await p.waitForTimeout(300);
+  const y = new Date(); y.setDate(y.getDate() - 1); const yk = key(y);
+  await p.evaluate(yk => { const st = { version: 1, dino: { kind: 'trex', placed: 3, chosen: true, giftGiven: true }, weekly: {}, days: {} };
+    for (let d = 0; d < 7; d++) st.weekly[d] = [{ sid: 'book' }, { sid: 'draw' }];
+    st.days[yk] = { missions: [{ sid: 'book', id: 'y1', status: 'done' }, { sid: 'draw', id: 'y2', status: 'todo' }], cheered: false };
+    st.focus = { mid: 'y2', total: 600000, left: 600000, endsAt: Date.now() + 600000, paused: false, rang: false };
+    localStorage.setItem('dinoPlanner', JSON.stringify(st)); }, yk);
+  await p.reload(); await p.waitForTimeout(1500);
+  // 하는 중 화면이 어제 할 일로 다시 열렸는지
+  console.log('doing reopened:', await p.evaluate(() => document.getElementById('doing').classList.contains('on')));
+  await p.click('#dLater'); await p.waitForTimeout(300);
+  const pinType = async code => { for (const c of code) await p.click(`#pinPad button[data-k="${c}"]`); };
+  await p.click('#corner'); await p.waitForTimeout(200); await pinType('123456'); await pinType('123456'); await p.waitForTimeout(300);
+  await p.click('#ptabs button[data-t="past"]'); await p.waitForTimeout(200);
+  await p.screenshot({ path: 'past_1.png' });
+  await p.click('button[data-a="pastDone"]'); await p.waitForTimeout(200);
+  await p.screenshot({ path: 'past_2.png' });
+  const st1 = await p.evaluate(yk => { const s = JSON.parse(localStorage.getItem('dinoPlanner')); return { y: s.days[yk].missions.map(m => m.status + (m.late ? '*' : '')), pending: s.dino.pending, placed: s.dino.placed }; }, yk);
+  console.log(st1);
+  await p.click('#pClose').catch(async () => { await p.click('#parent .close'); });
+  await p.waitForTimeout(1500);
+  console.log('rock visible/phase:', await p.evaluate(() => JSON.parse(localStorage.getItem('dinoPlanner')).dino.pending));
+  await p.screenshot({ path: 'past_3.png' });
+  console.log('errors', errs);
+  await b.close();
+})();
