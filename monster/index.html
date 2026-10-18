@@ -5286,11 +5286,12 @@ function renderHome() {
   $('progText').textContent = done >= need ? '조건 달성! 주말에 진화 🎉' : `${need - done}개 남음 (${done}/${need})`;
   $('progFill').style.width = `${Math.min(100, done / need * 100)}%`;
 
-  // 완성 후 새 달 → 새 몬스터
+  // 완성하면 바로 새 몬스터
   const m = state.monster; const nm = $('newMonsterRow'); nm.innerHTML = '';
   if (m.complete) {
-    if (dateKey().slice(0, 7) > (m.completedAt || '').slice(0, 7)) { const b = document.createElement('button'); b.className = 'big'; b.textContent = '🥚 새 달! 새 몬스터 만들기'; b.addEventListener('click', () => { if (confirm(`${m.name}은(는) 도감에 있어. 새 몬스터를 만들까?`)) { state.monster = null; state.focus = null; saveState(); openCreator(); } }); nm.appendChild(b); }
-    else nm.innerHTML = '<div class="allDone" style="font-size:16px;padding:6px 0">🏆 이번 달 완성! 다음 달에 새 몬스터를 만들 수 있어</div>';
+    const b = document.createElement('button'); b.className = 'big'; b.textContent = '🏆 완성! 🥚 새 몬스터 만들기';
+    b.addEventListener('click', () => { if (confirm(`${m.name}은(는) 도감에 있어. 새 몬스터를 만들까?`)) { state.monster = null; state.focus = null; saveState(); openCreator(); } });
+    nm.appendChild(b);
   }
   const d = todayData();
   const po = pastOpen(); $('pastBtn').textContent = po ? `📅 지난 날 · 어제 못 끝낸 것 ${po}` : '📅 지난 날'; $('pastBtn').classList.toggle('alert', !!po);
@@ -5450,7 +5451,7 @@ function completeMonster() {
   state.dex.push({ name: m.name, type: m.type, parts: { ...m.parts }, growth: m.growth, month, completedAt: m.completedAt, thumb: captureThumb() });
   saveState(); updateNameTag(); renderHome();
   $('badgeTitle').textContent = `${m.name} 완성!`; $('badgeMedal').textContent = `${+month.slice(5)}월`;
-  $('badgeText').textContent = `${+month.slice(5)}월 배지를 받았어. 도감에 등록됐고, 다음 달에 새 몬스터를 만들 수 있어!`;
+  $('badgeText').textContent = `${+month.slice(5)}월 배지를 받았어. 도감에 등록됐고, 이제 새 몬스터를 만들 수 있어!`;
   $('badge').classList.add('on'); sfx('done'); confetti();
 }
 $('badgeClose').addEventListener('click', () => $('badge').classList.remove('on'));
@@ -5468,8 +5469,8 @@ function renderDex() {
   }
   const cur = state.monster && !state.monster.complete ? 1 : 0;
   if (cur) { const b = document.createElement('div'); b.className = 'dcard empty'; b.innerHTML = `<div class="sil">🥚</div><div class="n">${state.monster.name}</div><div class="s">키우는 중 · ${STAGE_NAMES[state.monster.stage]}</div>`; grid.appendChild(b); }
-  for (let i = 0; i < 3; i++) { const b = document.createElement('div'); b.className = 'dcard empty'; b.innerHTML = '<div class="sil">?</div><div class="n">&nbsp;</div><div class="s">다음 달</div>'; grid.appendChild(b); }
-  if (!state.dex.length) { const p = document.createElement('p'); p.style.cssText = 'grid-column:1/-1;text-align:center;color:#888'; p.textContent = '아직 완성한 몬스터가 없어. 한 달 동안 키워서 첫 칸을 채워보자!'; grid.prepend(p); }
+  for (let i = 0; i < 3; i++) { const b = document.createElement('div'); b.className = 'dcard empty'; b.innerHTML = '<div class="sil">?</div><div class="n">&nbsp;</div><div class="s">다음 몬스터</div>'; grid.appendChild(b); }
+  if (!state.dex.length) { const p = document.createElement('p'); p.style.cssText = 'grid-column:1/-1;text-align:center;color:#888'; p.textContent = '아직 완성한 몬스터가 없어. 최종 진화까지 키워서 첫 칸을 채워보자!'; grid.prepend(p); }
 }
 function viewDex(e) {   // 도감 몬스터를 3D로 보기 (최종 모습)
   dexView = e; $('dex').classList.remove('on');
