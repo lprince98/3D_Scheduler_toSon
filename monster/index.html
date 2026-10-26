@@ -5271,7 +5271,7 @@ function openHome() {
   buildCurrent(); setBackground(m.type);
   updateNameTag();
   renderHome(); showScreen('home');
-  setTimeout(checkEvolution, 600);   // 진화 조건 확인 (주말 또는 지난 주)
+  setTimeout(checkEvolution, 600);   // 진화 조건 확인 (기준을 넘은 주가 있으면 바로)
 }
 function updateNameTag() {
   const m = state.monster; if (!m) return;
@@ -5283,7 +5283,7 @@ function renderHome() {
   const done = wk.reduce((n, k) => n + ((state.days[k]?.missions || []).filter(x => x.status === 'done').length), 0);
   const total = wk.reduce((n, k) => n + plannedCount(k), 0);
   const need = Math.max(1, Math.ceil(total * state.settings.evolveRate));
-  $('progText').textContent = done >= need ? '조건 달성! 주말에 진화 🎉' : `${need - done}개 남음 (${done}/${need})`;
+  $('progText').textContent = done >= need ? '조건 달성! 진화 🎉' : `${need - done}개 남음 (${done}/${need})`;
   $('progFill').style.width = `${Math.min(100, done / need * 100)}%`;
 
   // 완성하면 바로 새 몬스터
@@ -5375,11 +5375,10 @@ function checkEvolution() {
     const mon = wk[0]; const past = wk[6] < today; const isCur = mon === cur[0];
     if (mon > cur[0]) break;
     if (!m.checkedWeeks.includes(mon)) {
-      const weekend = isCur && (new Date().getDay() === 6 || new Date().getDay() === 0);
-      if (past || weekend) {
-        if (weekRatio(wk, createdKey) >= state.settings.evolveRate) { m.checkedWeeks.push(mon); saveState(); startEvolution(); return; }
-        if (past) { m.checkedWeeks.push(mon); saveState(); }
-      }
+      // 주말을 기다리지 않음: 그 주 기준을 넘는 순간 진화 (지난 날 완료 처리로 넘어도 같음)
+      if (weekRatio(wk, createdKey) >= state.settings.evolveRate) { startEvolution(mon); return; }   // 그 주 확정은 새 모습으로 바뀔 때 (연출 중 앱을 닫아도 진화가 사라지지 않게)
+      // 미달 주는 지난 날 완료 처리 기간(7일)이 끝난 뒤에만 확정 — 그 전엔 늦게 해도 다시 판정
+      if (past && wk[6] < pastKeys()[PAST_DAYS - 1]) { m.checkedWeeks.push(mon); saveState(); }
     }
     const next = new Date(wk[0] + 'T12:00:00'); next.setDate(next.getDate() + 7); wk = weekKeys(next);
   }
@@ -5387,8 +5386,9 @@ function checkEvolution() {
 
 /* ---- 진화 연출 (약 4초, 건너뛰기 가능): 빛 기둥 → 파티클 → 카메라 줌인 → 새 모습 ---- */
 const evo = { active: false, t: 0, swapped: false, light: null, pts: null, nextStage: 0, baseFov: 35 };
-function startEvolution() {
+function startEvolution(week = null) {
   const m = state.monster; if (evo.active || !m) return;
+  evo.week = week;
   evo.nextStage = Math.min(3, m.stage + 1); evo.t = 0; evo.swapped = false; evo.active = true;
   const aura = typeById(m.type).aura;
   const lm = new THREE.MeshBasicMaterial({ color: aura, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });   // 연출 중에만 쓰는 반투명 1개
@@ -5410,7 +5410,7 @@ function updateEvolution(dt) {
     if (t > 0.5) { evo.pts.visible = true; }
   } else if (!evo.swapped) {                              // 새 모습으로 교체
     evo.swapped = true; flash(); buzz([60, 40, 60]);
-    state.monster.stage = evo.nextStage; saveState(); buildCurrent(); updateNameTag();
+    applyEvolution();
     $('evoText').textContent = `${STAGE_NAMES[evo.nextStage]} 진화!`;
   } else {                                               // 1.6~4초: 튀어나오기 + 빛 사라짐 + 줌 복귀
     const p2 = Math.min(1, (t - 1.6) / 2.2);
@@ -5424,8 +5424,13 @@ function updateEvolution(dt) {
   if (evo.pts.visible) { const a = evo.pts.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 1.6; if (y > 4.5) y -= 4.5; a.setY(i, y); } a.needsUpdate = true; if (t > 3.2) evo.pts.visible = false; }
   camera.updateProjectionMatrix();
 }
+function applyEvolution() {
+  const m = state.monster;
+  if (evo.week && !m.checkedWeeks.includes(evo.week)) m.checkedWeeks.push(evo.week);
+  m.stage = evo.nextStage; saveState(); buildCurrent(); updateNameTag();
+}
 function endEvolution() {
-  if (!evo.swapped) { evo.swapped = true; state.monster.stage = evo.nextStage; saveState(); buildCurrent(); updateNameTag(); }
+  if (!evo.swapped) { evo.swapped = true; applyEvolution(); }
   scene.remove(evo.light, evo.pts); evo.light.geometry.dispose(); evo.light.material.dispose(); evo.pts.geometry.dispose(); evo.pts.material.dispose();
   evo.active = false; root.scale.setScalar(1); root.rotation.y = 0; userYaw = 0; camera.fov = evo.baseFov; camera.updateProjectionMatrix();
   $('evo').classList.remove('on'); $('hint').style.display = '';

@@ -6,7 +6,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 | 폴더 | 앱 | 대상 | 핵심 규칙 |
 |---|---|---|---|
 | `index.html` | 앱 선택 첫 화면 | — | 세 앱 링크 |
-| `monster/` | 몬스터 키우기 3D | 초5 형 | 미션 1개 = 성장 1번, 주간 달성률(기본 80%)이면 주말에 진화 (알→1차→2차→최종), 완성하면 바로 새 몬스터 |
+| `monster/` | 몬스터 키우기 3D | 초5 형 | 미션 1개 = 성장 1번, 주간 달성률(기본 80%)을 넘는 즉시 진화 (알→1차→2차→최종), 완성하면 바로 새 몬스터 |
 | `tank/` | 전차 조립 | 초5 형 | 미션 1개 = 부품 1개(단계 잠금 없이 다음 단계 부품도 미리 붙음), 과목 모듈이 맞으면 정품·아니면 회색, 주차별 단계 → 마감 → 완성 연출 |
 | `dinosaurus/` | 공룡 뼈 조립 | 만 4세 동생 (**한글 못 읽음**) | 할 일 1개 = 뼈 1개 (8조각) → 깨어남 → 아기 공룡이 할 일마다 자람(기본 4번) → 다 크면 다음 할 일에 공원으로 |
 
@@ -15,7 +15,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 ## 반드시 지킬 것
 
 - **서비스워커 VERSION 올리기**: 앱 파일을 고치면 그 폴더의 `sw.js`의 `VERSION`을 올린다. 안 올리면 태블릿이 옛 파일을 계속 쓴다.
-  현재: `monster3d-v15`, `tank-v4.7`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
+  현재: `monster3d-v16`, `tank-v4.7`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
 - **저장 공간 분리**: 세 앱이 같은 사이트(origin)라 localStorage를 함께 쓴다. 키는 `monsterPlanner3D`, `tankPlanner`, `dinoPlanner`(+IndexedDB `dinoPlannerVoice`). "모든 데이터 지우기"는 **자기 키만** 지워야 한다.
 - **공룡 아이 화면에는 글자 없음**: 그림·소리(음성 합성·부모 녹음)·손가락 안내만. 글자는 부모 모드에서만.
 - **부모 기능은 비밀번호(6자리) 뒤에**: 세 앱 모두 부모 모드 PIN. 공룡은 왼쪽 위 자물쇠 버튼(길게 누르기 아님 — 태블릿에서 안 됐음).
@@ -28,7 +28,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 ### monster/ (파일 하나)
 - `index.html` 안에 Three.js r186 IIFE 묶음(`window.THREE`) + 앱 스크립트. 앱 코드는 두 번째 `<script>`부터.
 - 데이터: `template`(매주 반복), `plans`(날짜별), `days[날짜].missions`(그날 미션, 지난 날도 남음), `monster`(파츠·성장·단계), `focus`(집중 타이머).
-- 진화: `checkEvolution()` — 주(월~일) 단위, 그 주 토·일이나 지난 주에 `weekRatio ≥ settings.evolveRate`이면 한 단계.
+- 진화: `checkEvolution()` — 주(월~일) 단위, `weekRatio ≥ settings.evolveRate`가 되는 즉시 한 단계(주말 대기 없음). 미달 주는 지난 날 기간(7일)이 지나야 `checkedWeeks`에 확정. 주 확정은 `applyEvolution()`(새 모습으로 바뀔 때).
 - 학생이 "오늘 할 것(detail)"을 적어야 시작 (`settings.studentDetail`, 끄면 부모 분량 사용). 완료 후 수정 불가.
 - 홈 "📅 지난 날": 최근 7일, 못 끝낸 것을 부모 PIN으로 완료 처리 (2분간 PIN 재사용).
 
