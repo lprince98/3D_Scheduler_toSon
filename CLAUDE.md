@@ -15,7 +15,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 ## 반드시 지킬 것
 
 - **서비스워커 VERSION 올리기**: 앱 파일을 고치면 그 폴더의 `sw.js`의 `VERSION`을 올린다. 안 올리면 태블릿이 옛 파일을 계속 쓴다.
-  현재: `monster3d-v16`, `tank-v4.7`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
+  현재: `monster3d-v16`, `tank-v4.8`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
 - **저장 공간 분리**: 세 앱이 같은 사이트(origin)라 localStorage를 함께 쓴다. 키는 `monsterPlanner3D`, `tankPlanner`, `dinoPlanner`(+IndexedDB `dinoPlannerVoice`). "모든 데이터 지우기"는 **자기 키만** 지워야 한다.
 - **공룡 아이 화면에는 글자 없음**: 그림·소리(음성 합성·부모 녹음)·손가락 안내만. 글자는 부모 모드에서만.
 - **부모 기능은 비밀번호(6자리) 뒤에**: 세 앱 모두 부모 모드 PIN. 공룡은 왼쪽 위 자물쇠 버튼(길게 누르기 아님 — 태블릿에서 안 됐음).
