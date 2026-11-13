@@ -7,7 +7,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 |---|---|---|---|
 | `index.html` | 앱 선택 첫 화면 | — | 세 앱 링크 |
 | `monster/` | 몬스터 키우기 3D | 초5 형 | 미션 1개 = 성장 1번, 주간 달성률(기본 80%)을 넘는 즉시 진화 (알→1차→2차→최종), 완성하면 바로 새 몬스터 |
-| `tank/` | 전차 조립 | 초5 형 | 미션 1개 = 부품 1개(단계 잠금 없이 다음 단계 부품도 미리 붙음), 과목 모듈이 맞으면 정품·아니면 회색, 주차별 단계 → 마감 → 완성 연출 |
+| `tank/` | 전차 조립 | 초5 형 | 미션 1개 = 부품 1개, 과목 모듈이 맞으면 정품·아니면 회색. **누적 진행**(주차 없음): 단계 부품을 다 붙이면 다음 단계 → 부품 44개 뒤 마감 4칸 → 완성 검수 즉시 완성 연출 |
 | `dinosaurus/` | 공룡 뼈 조립 | 만 4세 동생 (**한글 못 읽음**) | 할 일 1개 = 뼈 1개 (8조각) → 깨어남 → 아기 공룡이 할 일마다 자람(기본 4번) → 다 크면 다음 할 일에 공원으로 |
 
 각 폴더의 `PRD-*.md`가 기획서(규칙·변경 이력의 기준), `README*.md`가 사용 설명이다. 기능을 바꾸면 **PRD 변경 이력 표에 한 줄**을 추가하고 버전을 올린다.
@@ -15,7 +15,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 ## 반드시 지킬 것
 
 - **서비스워커 VERSION 올리기**: 앱 파일을 고치면 그 폴더의 `sw.js`의 `VERSION`을 올린다. 안 올리면 태블릿이 옛 파일을 계속 쓴다.
-  현재: `monster3d-v16`, `tank-v4.8`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
+  현재: `monster3d-v16`, `tank-v4.9`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
 - **저장 공간 분리**: 세 앱이 같은 사이트(origin)라 localStorage를 함께 쓴다. 키는 `monsterPlanner3D`, `tankPlanner`, `dinoPlanner`(+IndexedDB `dinoPlannerVoice`). "모든 데이터 지우기"는 **자기 키만** 지워야 한다.
 - **공룡 아이 화면에는 글자 없음**: 그림·소리(음성 합성·부모 녹음)·손가락 안내만. 글자는 부모 모드에서만.
 - **부모 기능은 비밀번호(6자리) 뒤에**: 세 앱 모두 부모 모드 PIN. 공룡은 왼쪽 위 자물쇠 버튼(길게 누르기 아님 — 태블릿에서 안 됐음).
@@ -34,6 +34,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 
 ### tank/ (ES 모듈)
 - `index.html` + `three.module.js`, `three.core.js`. 4호 전차 부품 44개(`PZ4_PARTS`), 단계 1~4, 마감 `FINISH_STEPS`.
+- 단계는 `syncStage()`가 누적 진행으로 계산(다음 부품의 단계, 다 붙이면 4). 주간 판정 없음. 완성 검수 → `build.status = 'ceremony'` → `startCeremonySoon()`.
 - 오늘 미션 `missions.items`, 지난 날 `history[날짜]`. 날짜 바뀜은 `ensureToday()`.
 - 화면 위 빈 상자는 `pointer-events: none`이어야 캔버스 드래그 회전이 된다 (`#stage-area`, `.stage-hole`, `#cere-bottom`).
 - 톡 치기: 조립 중엔 들썩+포탑 두리번, 최종 완성(완성 검수 통과 / 제원 카드 / 차고 목록의 완성 전차)이면 포탑이 보는 사람 쪽으로 조준 후 발사.
