@@ -4632,7 +4632,7 @@ function defaultState() {
   return {
     version: 1,
     settings: { quality: 'low', showStats: false, sound: true, voice: true, placeMode: 'drag', sleep: true, sleepMin: 3,
-      defaultMin: 10, confirmMode: 'math', skipAwaken: false, growSteps: 4, pinHash: null, names: ['쿵쿵이', '초롱이', '방울이', '튼튼이', '콩콩이', '뿌뿌'] },
+      defaultMin: 10, confirmMode: 'math', skipAwaken: false, growSteps: 4, bonus: true, bonusMin: 22 * 60, pinHash: null, names: ['쿵쿵이', '초롱이', '방울이', '튼튼이', '콩콩이', '뿌뿌'] },
     dino: { kind: 'trex', placed: 0, awake: false, pending: 0, inPlay: false, giftGiven: false, color: null, name: '', look: null, chosen: false, doneAt: '', thumb: '' },
     focus: null,
     subjects: DEFAULT_SUBJECTS.map(s => ({ ...s })),
@@ -6128,7 +6128,9 @@ $('dDone').onclick = () => {
 function completeMission(m) {
   m.status = 'done'; m.doneAt = Date.now(); save();
   wake(); renderHome();
+  const bonus = maybeBonus();                              // 기준 시각 전에 오늘 것을 다 하면 뼈(또는 자라기) 1개 더
   missionDone(subj(m.sid).color);
+  if (bonus) setTimeout(() => { sfx('sparkle'); guide('오늘 다 했어! 하나 더!'); }, 1500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && doingOpen) { keepAwake(); tickFocus(); } });
 function missionDone(color) {
@@ -6177,6 +6179,16 @@ function newDino(then) {
   state.dino = { ...defaultState().dino, kind: d.kind, giftGiven: true, chosen: false };
   save(); clearPlay(); applyVisibility(); sfx('sparkle');
   setTimeout(() => chooseDino(then), 500);
+}
+
+/* ---------- 보너스: 기준 시각(기본 밤 10시) 전에 오늘 할 일을 다 하면 뼈 1개 더 (하루 한 번) ----------
+   지난 날에서 "다 했어로 처리"한 것은 해당 없음. 쌓인 뼈(pending)로 넣어서 지금 바위·자라기가 끝나면 이어서 나옴 */
+const hhmm = n => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+function maybeBonus() {
+  const day = ensureToday(), S = state.settings;
+  if (!S.bonus || day.bonus || !allDoneToday() || nowMin() >= (S.bonusMin ?? 22 * 60)) return false;
+  day.bonus = true; state.dino.pending++; save(); return true;
 }
 
 /* ---------- 오늘 할 일 다 하면 축하 ---------- */
@@ -6665,6 +6677,8 @@ function tabSet() {
     <p class="note">형이 대신 풀어 주는 일이 있으면 비밀번호로 바꾸세요.</p>
   <h3>뼈 붙이기</h3><div class="row"><button class="${sel(s.placeMode === 'drag')}" data-a="pm" data-v="drag">끌어다 놓기</button><button class="${sel(s.placeMode === 'tap')}" data-a="pm" data-v="tap">누르면 날아가 붙기</button>
     <button class="${sel(s.skipAwaken)}" data-a="skipAw">깨어남 연출 짧게${s.skipAwaken ? ' 켬' : ''}</button></div>
+  <h3>오늘 다 하면 보너스</h3><div class="row"><button class="${sel(s.bonus)}" data-a="bonus">보너스 ${s.bonus ? '켜짐' : '꺼짐'}</button>
+    <span class="step"><button class="sm" data-a="bmin-">−</button><b>${hhmm(s.bonusMin ?? 22 * 60)}</b><button class="sm" data-a="bmin+">+</button></span><span class="note">이 시각 전에 그날 할 일을 다 하면 뼈(또는 자라기) 1개를 더 줍니다. 하루 한 번, 지난 날 처리는 제외</span></div>
   <h3>자라기</h3><div class="row">${[0, 2, 4, 6].map(v => `<button class="${sel(growSteps() === v)}" data-a="grow" data-v="${v}">${v ? v + '번' : '끔'}</button>`).join('')}</div>
     <p class="note">깨어난 공룡은 아기로 시작해 할 일을 이 횟수만큼 더 하면 다 큰 공룡이 되고, 그다음 할 일에서 공원으로 갑니다. 한 마리 = 뼈 8개 + 자라기 횟수.</p>
   <h3>소리</h3><div class="row"><button class="${sel(s.sound)}" data-a="sound">효과음 ${s.sound ? '켜짐' : '꺼짐'}</button><button class="${sel(s.voice)}" data-a="voice">안내 목소리 ${s.voice ? '켜짐' : '꺼짐'}</button></div>
@@ -6776,6 +6790,8 @@ $('pbody').addEventListener('click', async e => {
   if (a === 'pm') S.placeMode = t.dataset.v;
   if (a === 'skipAw') S.skipAwaken = !S.skipAwaken;
   if (a === 'grow') { S.growSteps = +t.dataset.v; save(); applyVisibility(); }
+  if (a === 'bonus') S.bonus = !S.bonus;
+  if (a === 'bmin-' || a === 'bmin+') S.bonusMin = clamp((S.bonusMin ?? 22 * 60) + (a === 'bmin+' ? 10 : -10), 17 * 60, 24 * 60);
   if (a === 'sound') S.sound = !S.sound;
   if (a === 'voice') S.voice = !S.voice;
   if (a === 'stats') { S.showStats = !S.showStats; statsEl.classList.toggle('hidden', !S.showStats); }

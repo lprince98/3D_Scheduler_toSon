@@ -536,6 +536,8 @@
     <div class="pcard">
       <div class="line"><span>타이머 기본 (분) <small>새로 넣는 미션의 시간</small></span><div class="stepper"><button id="tmMinus">−</button><b id="tmVal">20</b><button id="tmPlus">+</button></div></div>
       <div class="line"><span>세부사항은 학생이 입력 <small>켜면 부모는 과목·시간만, 무엇을 할지는 학생이 적음</small></span><button id="detailToggle">켜짐</button></div>
+      <div class="line"><span>오늘 다 하면 보너스 <small>이 시각 전에 그날 미션을 다 하면 부품 1개 더 (하루 한 번)</small></span><button id="bonusToggle">켜짐</button></div>
+      <div class="line"><span>보너스 기준 시각 <small>10분 단위</small></span><div class="stepper"><button id="bmMinus">−</button><b id="bmVal">23:00</b><button id="bmPlus">+</button></div></div>
       <div class="line"><span>효과음</span><button id="soundToggle">켜짐</button></div>
       <div class="line"><span>3D 품질 <small>낮음 권장 (발열)</small></span><button id="qualityBtn">낮음</button></div>
       <div class="line"><span>성능 표시 <small>왼쪽 아래 fps·삼각형 수</small></span><button id="statsToggle">켜짐</button></div>
@@ -694,7 +696,7 @@ function weekKey(d = new Date()) {   // 그 주 월요일 날짜
   const m = new Date(d); const day = (m.getDay() + 6) % 7; m.setDate(m.getDate() - day); return todayKey(m);
 }
 const defaultSubjects = () => Object.entries(DEFAULT_SUBJECTS).map(([name, module]) => ({ name, module }));
-const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', sound: true, showStats: true, pin: null, subjects: defaultSubjects(), studentDetail: true });
+const defaultSettings = () => ({ unlockRatio: 0.8, defaultMinutes: 20, quality: 'low', sound: true, showStats: true, pin: null, subjects: defaultSubjects(), studentDetail: true, bonus: true, bonusMin: 23 * 60 });
 // 비밀번호는 해시로 저장 (아이가 저장값을 봐도 모르게 하는 용도, 보안용 아님). 몬스터 앱과 같은 방식
 function hashPin(p) { let h = 5381; for (const c of p + '|tank') h = ((h << 5) + h + c.charCodeAt(0)) | 0; return 'h:' + (h >>> 0); }
 // 과목 → 모듈 (부모가 정한 과목 목록 기준, 지운 과목은 승무원 장비로)
@@ -1312,9 +1314,25 @@ function onMission(m) {
 function completeMission(m) {
   m.status = 'done'; m.doneAt = Date.now();
   if (m.detail) rememberDetail(m.subject, m.detail);
+  const bonus = maybeBonus(m);                              // 기준 시각 전에 오늘 것을 다 하면 부품 1개 더
   save();
   renderGarage();
   setTimeout(() => { attachNext(modOf(m.subject)); save(); renderGarage(); }, 350);   // 차고가 보인 뒤 결합
+  if (bonus) setTimeout(() => {                             // 단계 안내(1.8초 뒤)와 겹치지 않게 조금 뒤에
+    if (state.build.status !== 'building' || !screens.garage.classList.contains('on')) return;
+    const next = state.build.stage < 4 ? nextPart() : null;
+    toast('🌟 오늘 다 했어! 보너스 부품!'); sfx.chime();
+    setTimeout(() => { attachNext(next ? next.module : 'misc'); save(); renderGarage(); }, 900);   // 보너스는 정품으로
+  }, 3000);
+}
+/* 보너스: 기준 시각(기본 밤 11시) 전에 오늘 미션을 다 하면 부품(마감 단계면 마감 1칸) 1개 더, 하루 한 번.
+   지난 날 완료 처리(late)는 해당 없음. 오늘 미션 묶음(state.missions)에 표시 */
+function hhmm(n) { return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; }
+function maybeBonus(m) {
+  const S = state.settings, d = state.missions, now = new Date();
+  if (!S.bonus || d.bonus || m.late || !d.items.includes(m)) return false;
+  if (!d.items.every(x => x.status === 'done') || now.getHours() * 60 + now.getMinutes() >= S.bonusMin) return false;
+  d.bonus = true; return true;
 }
 // 결합 규칙: 다음 부품이 붙는다. 모듈이 맞으면 제색, 아니면 회색.
 // 회색으로 붙는 경우, 같은 모듈의 기존 회색 부품이 있으면 하나를 제색으로 교체.
@@ -1956,6 +1974,8 @@ function renderSettings() {
   const st = state.settings;
   $('#detailToggle').textContent = st.studentDetail ? '켜짐' : '꺼짐';
   $('#tmVal').textContent = st.defaultMinutes;
+  $('#bonusToggle').textContent = st.bonus ? '켜짐' : '꺼짐';
+  $('#bmVal').textContent = hhmm(st.bonusMin);
   $('#soundToggle').textContent = st.sound !== false ? '켜짐' : '꺼짐';
   $('#qualityBtn').textContent = st.quality === 'high' ? '높음' : '낮음';
   $('#statsToggle').textContent = st.showStats !== false ? '켜짐' : '꺼짐';
@@ -1965,6 +1985,9 @@ function renderSettings() {
 const stepper = (id, fn) => $('#' + id).addEventListener('click', () => { fn(state.settings); save(); renderSettings(); });
 stepper('tmMinus', st => { st.defaultMinutes = Math.max(5, st.defaultMinutes - 5); });
 stepper('tmPlus',  st => { st.defaultMinutes = Math.min(60, st.defaultMinutes + 5); });
+stepper('bmMinus', st => { st.bonusMin = Math.max(17 * 60, st.bonusMin - 10); });
+stepper('bmPlus',  st => { st.bonusMin = Math.min(24 * 60, st.bonusMin + 10); });
+$('#bonusToggle').addEventListener('click', () => { state.settings.bonus = !state.settings.bonus; save(); renderSettings(); });
 $('#detailToggle').addEventListener('click', () => { state.settings.studentDetail = !state.settings.studentDetail; save(); renderSettings(); });
 $('#soundToggle').addEventListener('click', () => { state.settings.sound = state.settings.sound === false; save(); renderSettings(); if (state.settings.sound) sfx.tick(); });
 $('#qualityBtn').addEventListener('click', () => { state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; save(); applyQuality(); renderSettings(); });

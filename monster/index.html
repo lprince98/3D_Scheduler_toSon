@@ -423,6 +423,8 @@
         <div class="line"><span>진화 기준 (%) <small>주간 달성률</small></span><div class="stepper"><button id="evMinus">−</button><b id="evVal">80</b><button id="evPlus">+</button></div></div>
         <div class="line"><span>타이머 기본 (분)</span><div class="stepper"><button id="tmMinus">−</button><b id="tmVal">20</b><button id="tmPlus">+</button></div></div>
         <div class="line"><span>파츠 해금 주기 <small>미션 n개마다 (4단계)</small></span><div class="stepper"><button id="ulMinus">−</button><b id="ulVal">7</b><button id="ulPlus">+</button></div></div>
+        <div class="line"><span>오늘 다 하면 보너스 <small>이 시각 전에 다 하면 성장 1번 더 (하루 한 번)</small></span><button id="bonusToggle">켜짐</button></div>
+        <div class="line"><span>보너스 기준 시각 <small>10분 단위</small></span><div class="stepper"><button id="bmMinus">−</button><b id="bmVal">22:30</b><button id="bmPlus">+</button></div></div>
         <div class="line"><span>세부사항은 학생이 입력 <small>켜면 부모는 과목·시간만, 무엇을 할지는 학생이 적음</small></span><button id="detailToggle">켜짐</button></div>
         <div class="line"><span>효과음</span><button id="soundToggle">켜짐</button></div>
         <div class="line"><span>3D 품질 <small>낮음 권장 (발열)</small></span><button id="qualityBtn">낮음</button></div>
@@ -4795,7 +4797,7 @@ function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(st
 const state = loadState();
 const freshInstall = !Object.keys(state).length;
 state.version = 1;
-state.settings = Object.assign({ quality:'low', evolveRate:0.8, showStats:true, timerMinutes:20, sound:true, unlockEvery:7, pin:null, studentDetail:true }, state.settings || {});
+state.settings = Object.assign({ quality:'low', evolveRate:0.8, showStats:true, timerMinutes:20, sound:true, unlockEvery:7, pin:null, studentDetail:true, bonus:true, bonusMin:22 * 60 + 30 }, state.settings || {});
 state.recentDetails = state.recentDetails || {};   // 과목별 학생이 최근 적은 것 { 과목: [최대 5개] }
 state.plans = state.plans || {};
 // 과목 목록: 부모가 추가·수정. 과목마다 몬스터 타입(카드 아이콘) 연결
@@ -5326,12 +5328,24 @@ function completeMission(ms) {
   state.totalDone++;
   let unlocked = null;                                      // 파츠 해금 (누적 n개마다)
   if (state.totalDone % state.settings.unlockEvery === 0 && state.unlocked < UNLOCK_ORDER.length) { unlocked = UNLOCK_ORDER[state.unlocked]; state.unlocked++; }
+  const bonus = maybeBonus(ms);                              // 기준 시각 전에 오늘 것을 다 하면 성장 1번 더
   saveState();
   buildCurrent();
   jump(2); toast('+1 성장!'); confetti(); sfx('done'); buzz([80, 60, 80]);
   if (unlocked) setTimeout(() => { toast(`🔓 새 파츠! ${PART_LABELS[unlocked[0]][unlocked[1]][0]}`); sfx('start'); }, 1500);
+  const bonusAt = unlocked ? 3000 : 1500;
+  if (bonus) setTimeout(() => { state.monster.growth++; saveState(); buildCurrent(); jump(2); toast('🌟 오늘 다 했어! 보너스 +1 성장'); confetti(); sfx('done'); }, bonusAt);
   renderHome();
-  setTimeout(checkEvolution, unlocked ? 3200 : 1800);
+  setTimeout(checkEvolution, bonusAt + (bonus ? 1500 : 300));
+}
+/* 보너스: 기준 시각(기본 밤 10시 30분) 전에 오늘 미션을 다 하면 성장 1번 더 (하루 한 번).
+   지난 날 완료 처리(late)·다른 날 미션은 해당 없음. 진화 달성률에는 들어가지 않음 (미션 수로만 계산) */
+function hhmm(n) { return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; }
+function maybeBonus(ms) {
+  const S = state.settings, d = todayData(), now = new Date();
+  if (!S.bonus || d.bonus || ms.late || !d.missions.includes(ms)) return false;
+  if (!d.missions.every(m => m.status === 'done') || now.getHours() * 60 + now.getMinutes() >= S.bonusMin) return false;
+  d.bonus = true; return true;
 }
 
 /* ---- 연출 (HTML) ---- */
@@ -5901,6 +5915,8 @@ function refreshSettings() {
   $('evVal').textContent = Math.round(state.settings.evolveRate * 100);
   $('tmVal').textContent = state.settings.timerMinutes;
   $('ulVal').textContent = state.settings.unlockEvery;
+  $('bonusToggle').textContent = state.settings.bonus ? '켜짐' : '꺼짐';
+  $('bmVal').textContent = hhmm(state.settings.bonusMin);
   $('soundToggle').textContent = state.settings.sound ? '켜짐' : '꺼짐';
   $('qualityBtn').textContent = state.settings.quality === 'high' ? '높음' : '낮음';
   $('statsToggle').textContent = state.settings.showStats ? '켜짐' : '꺼짐';
@@ -5949,6 +5965,8 @@ $('addSubject').addEventListener('click', () => {
 step('evMinus', 'evolveRate', 50, 100, -10, 100); step('evPlus', 'evolveRate', 50, 100, 10, 100);
 step('tmMinus', 'timerMinutes', 5, 60, -5); step('tmPlus', 'timerMinutes', 5, 60, 5);
 step('ulMinus', 'unlockEvery', 3, 15, -1); step('ulPlus', 'unlockEvery', 3, 15, 1);
+step('bmMinus', 'bonusMin', 17 * 60, 24 * 60, -10); step('bmPlus', 'bonusMin', 17 * 60, 24 * 60, 10);
+$('bonusToggle').addEventListener('click', () => { state.settings.bonus = !state.settings.bonus; saveState(); refreshSettings(); });
 $('detailToggle').addEventListener('click', () => { state.settings.studentDetail = !state.settings.studentDetail; saveState(); refreshSettings(); });
 $('soundToggle').addEventListener('click', () => { state.settings.sound = !state.settings.sound; saveState(); refreshSettings(); if (state.settings.sound) sfx('tap'); });
 $('qualityBtn').addEventListener('click', () => { state.settings.quality = state.settings.quality === 'high' ? 'low' : 'high'; saveState(); location.reload(); });

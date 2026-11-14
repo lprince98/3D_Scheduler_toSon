@@ -15,7 +15,7 @@ GitHub Pages로 배포: https://lprince98.github.io/3D_Scheduler_toSon/ (푸시 
 ## 반드시 지킬 것
 
 - **서비스워커 VERSION 올리기**: 앱 파일을 고치면 그 폴더의 `sw.js`의 `VERSION`을 올린다. 안 올리면 태블릿이 옛 파일을 계속 쓴다.
-  현재: `monster3d-v16`, `tank-v4.9`, `dino3d-v1.2`. 세 앱 모두 network-first + `cache: 'no-cache'`.
+  현재: `monster3d-v17`, `tank-v4.10`, `dino3d-v1.3`. 세 앱 모두 network-first + `cache: 'no-cache'`.
 - **저장 공간 분리**: 세 앱이 같은 사이트(origin)라 localStorage를 함께 쓴다. 키는 `monsterPlanner3D`, `tankPlanner`, `dinoPlanner`(+IndexedDB `dinoPlannerVoice`). "모든 데이터 지우기"는 **자기 키만** 지워야 한다.
 - **공룡 아이 화면에는 글자 없음**: 그림·소리(음성 합성·부모 녹음)·손가락 안내만. 글자는 부모 모드에서만.
 - **부모 기능은 비밀번호(6자리) 뒤에**: 세 앱 모두 부모 모드 PIN. 공룡은 왼쪽 위 자물쇠 버튼(길게 누르기 아님 — 태블릿에서 안 됐음).
@@ -57,13 +57,14 @@ Playwright + 헤드리스 크로미움. WebGL은 소프트웨어 렌더링 옵�
 chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 ```
 
-- 공룡: `python -m http.server 8765 -d dinosaurus` 후 `node dinosaurus/src/tests/tgrow.js` 등 (tflow: 마지막 뼈→깨어남→이름, tgrow: 자라기, tpick: 고르기 6장, tpast: 지난 날 탭, tnew: 새 공룡 렌더·삼각형 수)
+- 공룡: `python -m http.server 8765 -d dinosaurus` 후 `node dinosaurus/src/tests/tgrow.js` 등 (tflow: 마지막 뼈→깨어남→이름, tgrow: 자라기, tpick: 고르기 6장, tpast: 지난 날 탭, tnew: 새 공룡 렌더·삼각형 수, tbonus: 오늘 다 하면 보너스 뼈)
 - 확인 화면 크기: 가로 1280×800, 세로 800×1280, 작은 화면 1024×600
 - 펄스 애니메이션이 있는 버튼은 `click({ force: true })`
 - 짧은 연출(불꽃 등)은 rAF 시간을 느리게 해서 캡처: `addInitScript`로 `requestAnimationFrame` 콜백의 시간에 0.25를 곱함
 
 ## 지금까지의 주요 결정 (2026-09-25 ~ 10-15)
 
+- 세 앱: **오늘 다 하면 보너스** — 기준 시각(전차 23:00 / 몬스터 22:30 / 공룡 22:00, `settings.bonusMin` 분 단위) 전에 그날 미션을 다 하면 보상 1개 더(전차 부품 / 몬스터 성장 / 공룡 뼈·자라기), 하루 한 번, 지난 날 처리 제외. 부모 설정에서 켜기/끄기·시각 변경
 - 공룡: 하루 최대 3→5개, 2차 공룡 3종 추가(브라키오·안킬로·스피노), 고르기 화면에 완성한 공룡 별 표시, 자라기 단계 추가(조각을 잘게 쪼개는 대신 — 만 4세가 작은 조각을 끌어다 놓기 어려움)
 - 세 앱: 날짜가 바뀐 뒤에도 지난 날 미션을 보고 완료 처리 (몬스터·전차는 홈 버튼+부모 PIN, 공룡은 부모 모드 탭)
 - 몬스터·전차: 세부사항은 학생이 직접 입력 (`PLAN-STUDENT-DETAIL.md`), "나중에 적기" 없음
