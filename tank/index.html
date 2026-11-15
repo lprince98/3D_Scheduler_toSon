@@ -378,7 +378,7 @@
 <!-- 전차 선택 (월초) -->
 <section id="screen-select" class="screen">
   <h1>이번에 만들 전차</h1>
-  <p class="sub">초급 전차 중에서 한 대를 고르세요. 숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.</p>
+  <p class="sub" id="select-sub">숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.</p>
   <div id="tank-list"></div>
   <div id="select-actions"><button id="btn-select" class="btn">이 전차로 시작</button></div>
 </section>
@@ -588,15 +588,15 @@ const DEFAULT_SUBJECTS = {
 };
 const TIERS = [
   { id: 'basic',  name: '초급',      need: null },
-  { id: 'mid',    name: '중급',      need: 'basic' },   // 초급 1대 완성 시
-  { id: 'modern', name: '현대 전차', need: 'mid' },     // 중급 1대 완성 시
+  { id: 'mid',    name: '중급',      need: 'basic' },   // 초급 전차를 모두 완성하면
+  { id: 'modern', name: '현대 전차', need: 'mid' },     // 중급 전차를 모두 완성하면
 ];
 const TANKS = [
   { id: 'pz4', tier: 'basic', name: '4호 전차', country: '독일', year: 1939, nick: '독일군의 일꾼', ready: true,
     spec: { 주포: '7.5cm KwK 40 L/48', 중량: '25 t', 최고속도: '38 km/h', 승무원: '5명', 생산: '약 8,500대' } },
-  { id: 't34', tier: 'basic', name: 'T-34', country: '소련', year: 1940, nick: '경사 장갑의 원조', ready: false,
+  { id: 't34', tier: 'basic', name: 'T-34', country: '소련', year: 1940, nick: '경사 장갑의 원조', ready: true,
     spec: { 주포: '76.2mm F-34', 중량: '26 t', 최고속도: '53 km/h', 승무원: '4명' } },
-  { id: 'm4', tier: 'basic', name: 'M4 셔먼', country: '미국', year: 1942, nick: '가장 많이 만든 전차', ready: false,
+  { id: 'm4', tier: 'basic', name: 'M4 셔먼', country: '미국', year: 1942, nick: '가장 많이 만든 전차', ready: true,
     spec: { 주포: '75mm M3', 중량: '30 t', 최고속도: '38 km/h', 승무원: '5명' } },
   { id: 'tiger', tier: 'mid', name: '티거 I', country: '독일', year: 1942, nick: '두꺼운 장갑과 88mm', ready: false },
   { id: 'is2', tier: 'mid', name: 'IS-2', country: '소련', year: 1943, nick: '122mm 중전차', ready: false },
@@ -619,7 +619,7 @@ const CAMOS = [
 const UNIT_MARKS = [
   { id: 'none', name: '없음' }, { id: 'shield', name: '방패' }, { id: 'arrow', name: '화살' }, { id: 'bolt', name: '번개' },
 ];
-// 마감 항목 (부품 44개를 다 붙인 뒤): 미션 1개 완료 = 꾸미기 항목 1개 해금, 완성 검수 = 완성
+// 마감 항목 (부품 44개를 다 붙인 뒤 — 전차마다 부품 44개): 미션 1개 완료 = 꾸미기 항목 1개 해금, 완성 검수 = 완성
 const FINISH_STEPS = [
   { id: 'paint', name: '기본 도색', module: 'armor' },
   { id: 'camo', name: '위장 무늬', module: 'armor' },
@@ -677,8 +677,119 @@ const PZ4_PARTS = [
   { id: 'hskirt-r',  name: '차체 쉬르첸 우',stage: 3, module: 'armor',  parent: 'tank',   build: c => c.group([
       c.box(c.M.yellow, 5.0, 1.0, 0.05, -0.25, 0.70, 1.52), c.box(c.M.yellowDark, 5.0, 0.06, 0.16, -0.25, 1.15, 1.46)]) },
 ];
+// T-34 (1943년형 육각 포탑) 부품 목록. 4호 전차와 같은 44개 (하부 16 / 상부 14 / 무장·장비 14)
+// 큰 보기륜 5개(리턴 롤러 없음), 앞 유동륜·뒤 기동륜, 경사 장갑(옆·앞), 포탑이 앞쪽
+const T34_GL = { x0: 1.9, y0: 1.72, x1: 3.05, y1: 0.62 };                   // 앞 경사판(글라시스) 위·아래 끝
+const onGlacis = (g, t, off) => {                                            // 경사판 위 t(0~1) 지점에서 바깥으로 off
+  const dx = g.x1 - g.x0, dy = g.y1 - g.y0, L = Math.hypot(dx, dy);
+  return { x: g.x0 + dx * t + (-dy / L) * off, y: g.y0 + dy * t + (dx / L) * off, a: Math.atan2(dy, dx), L };
+};
+const T34_TRACK = [[-2.75, 0.97], [2.75, 0.94], [3.05, 0.62], [2.05, 0.04], [-2.05, 0.04], [-3.08, 0.62]];
+const T34_SIDE = (s, y) => ({ y: y + 0.479 * 0.05, z: s * (1.41 + 0.878 * 0.05) - s * (y - 1.43) * 0.546 });   // 옆 경사판 겉면 (높이 y)
+const T34_PARTS = [
+  // ---- 하부 ----
+  { id: 'hull-low',  name: '하부 차체',     stage: 1, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 5.8, 0.62, 2.06, -0.05, 0.80, 0) },
+  ...[0,1,2,3,4].map(i => ({ id: `road-r${i}`, name: `보기륜 우 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.roadWheel(2.05 - i * 1.025, 0.42, 1.30, 0.40, 0.44) })),
+  ...[0,1,2,3,4].map(i => ({ id: `road-l${i}`, name: `보기륜 좌 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.roadWheel(2.05 - i * 1.025, 0.42, -1.30, 0.40, 0.44) })),
+  { id: 'sprocket-r',name: '기동륜 우 (뒤)',stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.33, 0.46, 14, -2.75, 0.62, 1.30) },
+  { id: 'sprocket-l',name: '기동륜 좌 (뒤)',stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.33, 0.46, 14, -2.75, 0.62, -1.30) },
+  { id: 'idler',     name: '유동륜 좌·우',  stage: 1, module: 'armor',  parent: 'tank',   build: c => c.group([-1, 1].map(s => c.roadWheel(2.75, 0.62, s * 1.30, 0.30, 0.42))) },
+  { id: 'track-r',   name: '궤도 우',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.trackLoop(1.30, 0.50, T34_TRACK) },
+  { id: 'track-l',   name: '궤도 좌',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.trackLoop(-1.30, 0.50, T34_TRACK) },
+  // ---- 상부 ----
+  { id: 'hull-up',   name: '상부 차체',     stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 4.9, 0.56, 2.5, -0.55, 1.44, 0) },
+  { id: 'side-r',    name: '경사 장갑 우',  stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 5.5, 0.64, 0.07, -0.25, 1.43, 1.41, 0, 0, -0.5) },
+  { id: 'side-l',    name: '경사 장갑 좌',  stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 5.5, 0.64, 0.07, -0.25, 1.43, -1.41, 0, 0, 0.5) },
+  { id: 'glacis',    name: '앞 경사 장갑',  stage: 2, module: 'armor',  parent: 'tank',   build: c => { const g = onGlacis(T34_GL, 0.5, 0); return c.box(c.M.yellow, g.L, 0.09, 2.7, g.x, g.y, 0, 0, g.a); } },
+  { id: 'hatch-drv', name: '운전수 해치',   stage: 2, module: 'misc',   parent: 'tank',   build: c => { const g = onGlacis(T34_GL, 0.33, 0.07); return c.box(c.M.yellowDark, 0.55, 0.06, 0.6, g.x, g.y, -0.45, 0, g.a); } },
+  { id: 'rear-pl',   name: '뒤 경사 장갑',  stage: 2, module: 'engine', parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.81, 0.09, 2.5, -3.075, 1.335, 0, 0, 1.257) },
+  { id: 'deck',      name: '엔진 데크',     stage: 2, module: 'engine', parent: 'tank',   build: c => c.group([c.box(c.M.yellowDark, 1.7, 0.05, 1.5, -2.0, 1.745, 0),
+      ...[-0.5, -0.25, 0, 0.25, 0.5].map(z => c.box(c.M.steel, 1.3, 0.03, 0.08, -2.0, 1.78, z))]) },
+  { id: 'fender',    name: '앞 펜더',       stage: 2, module: 'armor',  parent: 'tank',   build: c => c.group([-1, 1].map(s => c.box(c.M.yellow, 0.55, 0.04, 0.52, 2.80, 1.02, s * 1.30, 0, -0.25))) },
+  { id: 'turret',    name: '포탑 본체',     stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 1.7, 0.66, 1.5, 0, 0.33, 0) },
+  { id: 'turret-sl', name: '포탑 경사판 좌',stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 1.95, 0.66, 0.10, -0.05, 0.35, -0.82, -0.12, 0, 0.32) },
+  { id: 'turret-sr', name: '포탑 경사판 우',stage: 2, module: 'armor',  parent: 'turret', build: c => c.box(c.M.yellow, 1.95, 0.66, 0.10, -0.05, 0.35, 0.82, 0.12, 0, -0.32) },
+  { id: 'turret-rear',name:'포탑 뒤 장갑',  stage: 2, module: 'misc',   parent: 'turret', build: c => c.box(c.M.yellowDark, 0.5, 0.56, 1.45, -1.0, 0.35, 0, 0, -0.28) },
+  { id: 'hatch-l',   name: '포탑 해치 좌',  stage: 2, module: 'misc',   parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.27, 0.07, 12, -0.25, 0.69, -0.36) },
+  { id: 'hatch-r',   name: '포탑 해치 우',  stage: 2, module: 'gun',    parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.27, 0.07, 12, -0.25, 0.69, 0.36) },
+  // ---- 무장·장비 ----
+  { id: 'mantlet',   name: '포방패',        stage: 3, module: 'gun',    parent: 'turret', build: c => c.box(c.M.yellowDark, 0.36, 0.50, 0.80, 0.98, 0.33, 0) },
+  { id: 'gun-sleeve',name: '포신 덮개',     stage: 3, module: 'gun',    parent: 'turret', build: c => c.tube(c.M.yellowDark, 0.12, 0.6, 10, 1.45, 0.36, 0, false) },
+  { id: 'gun',       name: '주포 (76mm)',   stage: 3, module: 'gun',    parent: 'turret', build: c => c.tube(c.M.yellowDark, 0.07, 2.55, 10, 2.475, 0.36, 0) },
+  { id: 'mg',        name: '차체 기관총',   stage: 3, module: 'gun',    parent: 'tank',   build: c => { const g = onGlacis(T34_GL, 0.45, 0.06); return c.group([c.cyl(c.M.yellowDark, 0.13, 0.10, 10, g.x, g.y, 0.62), c.tube(c.M.gunDark, 0.04, 0.4, 8, g.x + 0.2, g.y, 0.62)]); } },
+  { id: 'periscope', name: '잠망경',        stage: 3, module: 'radio',  parent: 'turret', build: c => c.group([-1, 1].map(s => c.box(c.M.steel, 0.16, 0.14, 0.12, 0.45, 0.72, s * 0.45))) },
+  { id: 'antenna',   name: '안테나',        stage: 3, module: 'radio',  parent: 'turret', build: c => c.cyl(c.M.steel, 0.015, 1.6, 5, -0.95, 1.40, 0.55) },   // 포탑 뒤 위: 포탑과 같이 돌아서 주포에 걸리지 않음
+  { id: 'fuel-r',    name: '보조 연료통 우',stage: 3, module: 'engine', parent: 'tank',   build: c => { const q = T34_SIDE(1, 1.55); return c.group([-1.35, -2.4].map(x => c.tube(c.M.yellowDark, 0.19, 0.9, 10, x, q.y + 0.12, q.z + 0.18, false))); } },
+  { id: 'fuel-l',    name: '보조 연료통 좌',stage: 3, module: 'engine', parent: 'tank',   build: c => { const q = T34_SIDE(-1, 1.55); return c.group([-1.35, -2.4].map(x => c.tube(c.M.yellowDark, 0.19, 0.9, 10, x, q.y + 0.12, q.z - 0.18, false))); } },
+  { id: 'exhaust',   name: '배기관',        stage: 3, module: 'engine', parent: 'tank',   build: c => c.group([-1, 1].map(s => c.tube(c.M.steel, 0.09, 0.3, 8, -3.25, 1.02, s * 0.55))) },
+  { id: 'lamp',      name: '전조등',        stage: 3, module: 'misc',   parent: 'tank',   build: c => { const g = onGlacis(T34_GL, 0.22, 0.09); return c.tube(c.M.steel, 0.09, 0.16, 8, g.x, g.y, -1.0, false); } },
+  { id: 'toolbox',   name: '공구함',        stage: 3, module: 'misc',   parent: 'tank',   build: c => { const q = T34_SIDE(-1, 1.5); return c.box(c.M.yellowDark, 0.9, 0.24, 0.24, 0.55, q.y + 0.06, q.z - 0.1, 0, 0, 0.5); } },
+  { id: 'spare',     name: '예비 궤도',     stage: 3, module: 'armor',  parent: 'tank',   build: c => { const g = onGlacis(T34_GL, 0.74, 0.06); return c.box(c.M.track, 0.5, 0.06, 0.9, g.x, g.y, 0.05, 0, g.a); } },
+  { id: 'cable',     name: '견인 줄',       stage: 3, module: 'armor',  parent: 'tank',   build: c => { const q = T34_SIDE(1, 1.28); return c.tube(c.M.steel, 0.035, 3.6, 6, -0.4, q.y + 0.02, q.z + 0.03, false); } },
+  { id: 'rail',      name: '손잡이',        stage: 3, module: 'misc',   parent: 'turret', build: c => c.group([-1, 1].map(s => c.box(c.M.steel, 1.1, 0.04, 0.04, -0.15, 0.50, s * 0.98))) },
+];
+
+// M4 셔먼 부품 목록. 44개 (하부 16 / 상부 14 / 무장·장비 14)
+// 수직 볼류트 서스펜션(보기 3개, 보기마다 바퀴 2개 + 위 롤러), 앞 기동륜·뒤 유동륜, 높은 차체, 둥근 주조 포탑
+const M4_GL = { x0: 1.65, y0: 1.925, x1: 2.55, y1: 1.34 };
+const M4_TRACK = [[2.65, 1.13], [3.03, 0.78], [1.95, 0.04], [-1.95, 0.04], [-3.02, 0.42], [-2.75, 0.70], [-1.55, 0.98]];
+const M4_PARTS = [
+  // ---- 하부 ----
+  { id: 'hull-low',  name: '하부 차체',     stage: 1, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 5.3, 0.62, 2.0, -0.2, 0.86, 0) },
+  { id: 'nose',      name: '변속기 덮개',   stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.yellowDark, 0.42, 2.3, 14, 2.55, 0.92, 0) },
+  ...[0,1,2].map(i => ({ id: `vvss-r${i}`, name: `보기 우 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.vvss(1.55 - i * 1.55, 1.25) })),
+  ...[0,1,2].map(i => ({ id: `vvss-l${i}`, name: `보기 좌 ${i+1}`, stage: 1, module: 'armor', parent: 'tank', build: c => c.vvss(1.55 - i * 1.55, -1.25) })),
+  { id: 'sprocket-r',name: '기동륜 우 (앞)',stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.38, 0.40, 16, 2.65, 0.75, 1.25) },
+  { id: 'sprocket-l',name: '기동륜 좌 (앞)',stage: 1, module: 'engine', parent: 'tank',   build: c => c.wheel(c.M.track, 0.38, 0.40, 16, 2.65, 0.75, -1.25) },
+  { id: 'idler-r',   name: '유동륜 우',     stage: 1, module: 'armor',  parent: 'tank',   build: c => c.roadWheel(-2.75, 0.42, 1.25, 0.28, 0.36) },
+  { id: 'idler-l',   name: '유동륜 좌',     stage: 1, module: 'armor',  parent: 'tank',   build: c => c.roadWheel(-2.75, 0.42, -1.25, 0.28, 0.36) },
+  { id: 'track-r',   name: '궤도 우',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.trackLoop(1.25, 0.42, M4_TRACK) },
+  { id: 'track-l',   name: '궤도 좌',       stage: 1, module: 'armor',  parent: 'tank',   build: c => c.trackLoop(-1.25, 0.42, M4_TRACK) },
+  { id: 'rear-low',  name: '뒤 하부 장갑',  stage: 1, module: 'engine', parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.10, 0.66, 2.0, -2.88, 0.90, 0, 0, 0.22) },
+  { id: 'hook',      name: '견인 고리',     stage: 1, module: 'misc',   parent: 'tank',   build: c => c.group([-1, 1].map(s => c.box(c.M.steel, 0.22, 0.12, 0.10, 3.0, 0.78, s * 0.6))) },
+  // ---- 상부 ----
+  { id: 'hull-up',   name: '상부 차체',     stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 4.4, 0.75, 2.9, -0.55, 1.55, 0) },
+  { id: 'glacis',    name: '앞 경사 장갑',  stage: 2, module: 'armor',  parent: 'tank',   build: c => { const g = onGlacis(M4_GL, 0.5, 0); return c.box(c.M.yellow, g.L + 0.04, 0.10, 2.9, g.x, g.y, 0, 0, g.a); } },
+  { id: 'hatch-drv', name: '운전수 해치',   stage: 2, module: 'misc',   parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.55, 0.06, 0.5, 1.40, 1.955, -0.62) },
+  { id: 'hatch-asst',name: '부운전수 해치', stage: 2, module: 'radio',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.55, 0.06, 0.5, 1.40, 1.955, 0.62) },
+  { id: 'peri-drv',  name: '해치 잠망경',   stage: 2, module: 'misc',   parent: 'tank',   build: c => c.group([-1, 1].map(s => c.box(c.M.steel, 0.12, 0.12, 0.10, 1.60, 2.03, s * 0.62))) },
+  { id: 'deck',      name: '엔진 데크',     stage: 2, module: 'engine', parent: 'tank',   build: c => c.box(c.M.yellowDark, 1.3, 0.05, 1.9, -1.75, 1.95, 0) },
+  { id: 'grille',    name: '엔진 그릴',     stage: 2, module: 'engine', parent: 'tank',   build: c => c.group([-0.6, -0.3, 0, 0.3, 0.6].map(z => c.box(c.M.steel, 0.34, 0.04, 0.12, -2.55, 1.95, z))) },
+  { id: 'rear-up',   name: '뒤 상부 장갑',  stage: 2, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 0.10, 0.75, 2.6, -2.80, 1.55, 0) },
+  { id: 'turret',    name: '포탑 본체',     stage: 2, module: 'armor',  parent: 'turret', build: c => c.group([c.cone(c.M.yellow, 0.88, 1.0, 0.70, 18, 0, 0.35, 0), c.cyl(c.M.yellowDark, 0.92, 0.08, 18, 0, -0.03, 0)]) },   // 아래 포탑 링이 차체 위 틈을 메움
+  { id: 'bustle',    name: '포탑 뒤 무전기실', stage: 2, module: 'radio', parent: 'turret', build: c => c.box(c.M.yellow, 0.7, 0.55, 1.3, -0.95, 0.30, 0) },
+  { id: 'turret-top',name: '포탑 지붕',     stage: 2, module: 'armor',  parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.86, 0.05, 18, 0, 0.72, 0) },
+  { id: 'cupola',    name: '전차장 해치',   stage: 2, module: 'gun',    parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.30, 0.18, 12, -0.25, 0.83, 0.42) },
+  { id: 'hatch-ld',  name: '탄약수 해치',   stage: 2, module: 'misc',   parent: 'turret', build: c => c.box(c.M.yellowDark, 0.45, 0.05, 0.4, -0.2, 0.77, -0.42) },
+  { id: 'vent',      name: '환기구',        stage: 2, module: 'engine', parent: 'turret', build: c => c.cyl(c.M.yellowDark, 0.12, 0.12, 8, 0.3, 0.80, -0.15) },
+  // ---- 무장·장비 ----
+  { id: 'mantlet',   name: '포방패',        stage: 3, module: 'gun',    parent: 'turret', build: c => c.group([c.box(c.M.yellowDark, 0.32, 0.62, 0.95, 1.05, 0.38, 0), c.box(c.M.yellowDark, 0.16, 0.30, 0.40, 1.27, 0.40, 0)]) },
+  { id: 'gun',       name: '주포 (75mm)',   stage: 3, module: 'gun',    parent: 'turret', build: c => c.tube(c.M.yellowDark, 0.075, 2.3, 10, 2.45, 0.42, 0) },
+  { id: 'mg',        name: '차체 기관총',   stage: 3, module: 'gun',    parent: 'tank',   build: c => { const g = onGlacis(M4_GL, 0.45, 0.06); return c.group([c.cyl(c.M.yellowDark, 0.12, 0.10, 10, g.x, g.y, 0.6), c.tube(c.M.gunDark, 0.045, 0.4, 8, g.x + 0.2, g.y, 0.6)]); } },
+  { id: 'mg50',      name: '대공 기관총',   stage: 3, module: 'gun',    parent: 'turret', build: c => c.group([c.cyl(c.M.steel, 0.03, 0.25, 6, -0.1, 0.97, 0.42), c.tube(c.M.gunDark, 0.04, 1.1, 8, 0.25, 1.06, 0.42)]) },
+  { id: 'antenna',   name: '안테나',        stage: 3, module: 'radio',  parent: 'turret', build: c => c.cyl(c.M.steel, 0.015, 1.6, 5, -1.05, 1.35, -0.45) },
+  { id: 'lamp',      name: '전조등',        stage: 3, module: 'misc',   parent: 'tank',   build: c => { const g = onGlacis(M4_GL, 0.2, 0.09); return c.group([-1, 1].flatMap(s => [c.tube(c.M.steel, 0.09, 0.16, 8, g.x + 0.05, g.y, s * 1.15, false), c.box(c.M.steel, 0.04, 0.22, 0.04, g.x + 0.18, g.y, s * 1.15)])); } },
+  { id: 'app-r',     name: '덧댄 장갑 우',  stage: 3, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 0.9, 0.5, 0.05, 0.25, 1.6, 1.48) },
+  { id: 'app-l',     name: '덧댄 장갑 좌',  stage: 3, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellow, 0.9, 0.5, 0.05, 0.25, 1.6, -1.48) },
+  { id: 'sand-r',    name: '모래막이 우',   stage: 3, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 4.2, 0.32, 0.04, -0.5, 1.02, 1.47) },
+  { id: 'sand-l',    name: '모래막이 좌',   stage: 3, module: 'armor',  parent: 'tank',   build: c => c.box(c.M.yellowDark, 4.2, 0.32, 0.04, -0.5, 1.02, -1.47) },
+  { id: 'exhaust',   name: '배기 디플렉터', stage: 3, module: 'engine', parent: 'tank',   build: c => c.box(c.M.steel, 0.30, 0.06, 2.0, -3.0, 1.20, 0, 0, 0.6) },
+  { id: 'tools',     name: '공구 (삽·도끼)',stage: 3, module: 'misc',   parent: 'tank',   build: c => c.group([c.box(c.M.steel, 1.1, 0.05, 0.10, -1.9, 1.995, 0.75), c.box(c.M.gunDark, 0.9, 0.05, 0.08, -1.9, 1.995, -0.75)]) },
+  { id: 'spare',     name: '예비 궤도',     stage: 3, module: 'armor',  parent: 'tank',   build: c => { const g = onGlacis(M4_GL, 0.74, 0.06); return c.box(c.M.track, 0.4, 0.06, 1.0, g.x, g.y, -0.25, 0, g.a); } },
+  { id: 'jerry',     name: '연료통',        stage: 3, module: 'misc',   parent: 'tank',   build: c => c.group([-1, 1].map(s => c.box(c.M.yellowDark, 0.18, 0.42, 0.32, -2.93, 1.45, s * 0.85))) },
+];
+// 전차별 배치: 포탑 자리, 포구 끝(포탑 기준), 반동 부품, 기본 색, 마킹 자리 [x, y, z, 옆 기울기(Y), 위로 기울기(X)]
+const TANK_LAYOUT = {
+  pz4: { parts: PZ4_PARTS, turret: [0.20, 1.76, 0], muzzle: [4.2, 0.40, 0], recoil: ['gun', 'muzzle'], base: 'dunkelgelb',
+         decal: { number: [-0.55, 0.40, 1.43, 0.08, 0], national: [1.4, 0.75, 1.55, 0, 0], unit: [-1.6, 0.75, 1.55, 0, 0] } },
+  t34: { parts: T34_PARTS, turret: [0.85, 1.75, 0], muzzle: [3.75, 0.36, 0], recoil: ['gun', 'gun-sleeve'], base: 'soviet',
+         decal: { number: [-0.1, 0.33, 0.90, -0.12, 0.32], national: [1.2, T34_SIDE(1, 1.43).y, T34_SIDE(1, 1.43).z + 0.01, 0, 0.5], unit: [-0.9, T34_SIDE(1, 1.43).y, T34_SIDE(1, 1.43).z + 0.01, 0, 0.5] } },
+  m4:  { parts: M4_PARTS, turret: [0.15, 1.99, 0], muzzle: [3.6, 0.42, 0], recoil: ['gun'], base: 'olive',
+         decal: { number: [-0.95, 0.30, 0.66, 0, 0], national: [1.1, 1.55, 1.46, 0, 0], unit: [-1.6, 1.55, 1.46, 0, 0] } },
+};
+const layoutOf = id => TANK_LAYOUT[id] || TANK_LAYOUT.pz4;
 const STAGE_NAMES = { 1: '하부', 2: '상부', 3: '무장·장비', 4: '마감' };
-const defaultDecor = () => ({ base: 'dunkelgelb', camo: 'none', national: false, unit: 'none', number: '' });
+const defaultDecor = tankId => ({ base: layoutOf(tankId).base, camo: 'none', national: false, unit: 'none', number: '' });
 const DURATIONS = [20, 30, 40, 50];   // 미션 시간 선택지(분)
 // 주간 목표·해금 기준은 settings(부모 모드)에서. 해금 자체는 4단계
 
@@ -736,7 +847,7 @@ function migrate(s) {
   }
   s.template = s.template || {};
   s.build = Object.assign({ stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' }, s.build || {});
-  s.decor = Object.assign(defaultDecor(), s.decor || {}); s.garage = s.garage || [];
+  s.decor = Object.assign(defaultDecor(s.tank), s.decor || {}); s.garage = s.garage || [];
   s.settings = Object.assign(defaultSettings(), s.settings || {}); delete s.settings.missionsPerDay;
   if (!Array.isArray(s.settings.subjects) || !s.settings.subjects.length) s.settings.subjects = defaultSubjects();
   if (s.settings.pin && !String(s.settings.pin).startsWith('h:')) s.settings.pin = hashPin(String(s.settings.pin));   // 예전 평문 비밀번호 → 해시
@@ -864,8 +975,8 @@ const geoCache = new Map();
 function cached(key, make) { if (!geoCache.has(key)) geoCache.set(key, make()); return geoCache.get(key); }
 const ctx = {
   M, TRACK_Z: 1.24, TRACK_W: 0.40,
-  box(mat, w, h, d, x, y, z, rotY = 0, rotZ = 0) {
-    const m = new THREE.Mesh(boxGeo, mat); m.scale.set(w, h, d); m.position.set(x, y, z); m.rotation.set(0, rotY, rotZ); return m;
+  box(mat, w, h, d, x, y, z, rotY = 0, rotZ = 0, rotX = 0) {
+    const m = new THREE.Mesh(boxGeo, mat); m.scale.set(w, h, d); m.position.set(x, y, z); m.rotation.set(rotX, rotY, rotZ); return m;
   },
   wheel(mat, r, w, seg, x, y, z) {          // 축이 Z(좌우)
     const g = cached(`w${r}|${w}|${seg}`, () => new THREE.CylinderGeometry(r, r, w, seg).rotateX(Math.PI / 2));
@@ -879,7 +990,26 @@ const ctx = {
     const g = cached(`c${r}|${h}|${seg}`, () => new THREE.CylinderGeometry(r, r, h, seg));
     const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m;
   },
+  cone(mat, rTop, rBot, h, seg, x, y, z) {   // 축이 Y, 위가 좁은 원뿔대 (주조 포탑)
+    const g = cached(`k${rTop}|${rBot}|${h}|${seg}`, () => new THREE.CylinderGeometry(rTop, rBot, h, seg));
+    const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m;
+  },
   group(children) { const g = new THREE.Group(); children.forEach(c => g.add(c)); return g; },
+  roadWheel(x, y, z, r, w) {                 // 고무 바퀴 + 허브 (T-34·M4)
+    return this.group([this.wheel(M.rubber, r, w, 16, x, y, z), this.wheel(M.yellow, r * 0.55, w + 0.02, 10, x, y, z)]);
+  },
+  trackLoop(z, W, pts) {                     // 점들을 이은 닫힌 궤도 띠 (XY 평면, 각 변이 판 1장)
+    return this.group(pts.map((p, i) => {
+      const q = pts[(i + 1) % pts.length], dx = q[0] - p[0], dy = q[1] - p[1];
+      return this.box(M.track, Math.hypot(dx, dy) + 0.06, 0.08, W, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, z, 0, Math.atan2(dy, dx));
+    }));
+  },
+  vvss(x, z) {                               // M4 수직 볼류트 보기: 바퀴 2개 + 보기 몸통 + 위 롤러
+    return this.group([
+      ...[-0.36, 0.36].flatMap(dx => [this.wheel(M.rubber, 0.25, 0.30, 14, x + dx, 0.27, z), this.wheel(M.yellow, 0.13, 0.32, 10, x + dx, 0.27, z)]),
+      this.box(M.yellowDark, 0.42, 0.36, 0.30, x, 0.52, z), this.wheel(M.rubber, 0.11, 0.26, 10, x - 0.12, 0.86, z),
+    ]);
+  },
   bogie(side, i) {                           // 보기륜 2개 + 허브 2개 (한 보기 단위)
     const z = side * this.TRACK_Z, y = 0.08 + 0.235;
     const xs = [1.85 - (i * 2) * (3.7 / 7), 1.85 - (i * 2 + 1) * (3.7 / 7)];
@@ -905,6 +1035,8 @@ function buildTank(parts) {
   { if (fx.fire >= 0) turret.rotation.y = fx.aimBase; if (fx.swing >= 0) turret.rotation.y = fx.swingBase; fx.hop = fx.swing = fx.fire = -1; fx.recoil = []; flashMesh.visible = false; tank.position.y = 0; tank.rotation.z = 0; }
   for (const v of partObjects.values()) v.obj.parent.remove(v.obj);
   partObjects.clear();
+  turret.position.fromArray(layoutOf(state.tank).turret); turret.rotation.y = 0;
+  placeDecals();
   for (const p of parts) {
     const obj = p.build(ctx);
     const parent = p.parent === 'turret' ? turret : tank;
@@ -976,7 +1108,7 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffc94a, transparent: tru
 const flashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), flashMat);
 const flashCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), new THREE.MeshBasicMaterial({ color: 0xfff6d0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
 flashMesh.add(flashCore); flashMesh.visible = false; turret.add(flashMesh);
-const MUZZLE_TIP = new THREE.Vector3(4.2, 0.40, 0);          // 포탑 기준 머즐 브레이크 끝
+const MUZZLE_TIP = new THREE.Vector3(4.2, 0.40, 0);          // 포탑 기준 포구 끝 (전차마다 placeDecals에서 맞춤)
 const puffGeo = new THREE.IcosahedronGeometry(0.32, 1);
 const puffs = Array.from({ length: 10 }, () => {
   const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xd8d2c4, transparent: true, opacity: 0, depthWrite: false }));
@@ -1001,7 +1133,7 @@ function fireGun() {
 }
 function shoot() {
   fx.shot = true;
-  fx.recoil = ['gun', 'muzzle'].map(id => partObjects.get(id)).filter(v => v && v.obj.visible);
+  fx.recoil = layoutOf(state.tank).recoil.map(id => partObjects.get(id)).filter(v => v && v.obj.visible);
   flashMesh.position.set(MUZZLE_TIP.x + 0.55, MUZZLE_TIP.y, 0); flashMesh.visible = true;
   turret.updateMatrixWorld(true);
   const tip = turret.localToWorld(MUZZLE_TIP.clone()), dir = turret.localToWorld(MUZZLE_TIP.clone().add(new THREE.Vector3(1, 0, 0))).sub(tip).normalize();
@@ -1227,19 +1359,33 @@ const THUMBS = {
   m4:  `<svg viewBox="0 0 100 50"><rect x="10" y="32" width="80" height="11" rx="5" fill="#333"/><rect x="10" y="16" width="80" height="17" rx="2" fill="#6b6a4a"/><ellipse cx="50" cy="14" rx="15" ry="8" fill="#7a7955"/><rect x="60" y="12" width="32" height="3" fill="#4a4a48"/>${[22,30,42,50,62,70].map(x=>`<circle cx="${x}" cy="37" r="3.5" fill="#7a7955"/>`).join('')}</svg>`,
 };
 let pendingTank = null;
-const completedInTier = tier => state.garage.filter(g => (TANKS.find(t => t.id === g.tank) || {}).tier === tier).length;
-const tierUnlocked = tier => { const t = TIERS.find(x => x.id === tier); return !t.need || completedInTier(t.need) > 0; };
+// 해금: 목록 순서대로 한 대씩. 앞 전차를 완성하면 다음 전차가 열리고, 한 등급을 모두 완성하면 다음 등급
+// (4호 전차 → T-34 → M4 셔먼 → 티거 I → …). 한 번 완성한 전차는 언제든 다시 만들 수 있음
+const doneCount = id => state.garage.filter(g => g.tank === id).length;
+const tierUnlocked = tier => { const t = TIERS.find(x => x.id === tier); return !t.need || TANKS.filter(x => x.tier === t.need).every(x => doneCount(x.id) > 0); };
+function tankOpen(t) {
+  const i = TANKS.indexOf(t);
+  return tierUnlocked(t.tier) && (i === 0 || doneCount(t.id) > 0 || doneCount(TANKS[i - 1].id) > 0);
+}
+const nextTank = () => TANKS.find(t => t.ready && tankOpen(t) && !doneCount(t.id)) || null;   // 다음 차례 (아직 안 만든 전차)
+function lockNote(t) {
+  if (!tierUnlocked(t.tier)) { const need = TIERS.find(x => x.id === TIERS.find(y => y.id === t.tier).need); return `🔒 ${need.name} 전차를 모두 완성하면 열려요`; }
+  return `🔒 ${TANKS[TANKS.indexOf(t) - 1].name}을(를) 완성하면 열려요`;
+}
 function renderSelect() {
   const list = $('#tank-list'); list.innerHTML = '';
+  const nt = nextTank();
+  if (!pendingTank && nt) pendingTank = nt.id;                 // 다음 차례 전차를 미리 골라 둠
+  $('#select-sub').textContent = nt ? `다음 차례는 ${nt.name}! 숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.` : '만든 전차를 다시 만들 수 있어요. 새 전차는 준비 중이에요.';
   for (const t of TANKS) {
-    const unlocked = tierUnlocked(t.tier), tierName = TIERS.find(x => x.id === t.tier).name;
-    if (!unlocked && t.tier === 'modern' && !tierUnlocked('mid')) continue;   // 두 단계 위는 아직 안 보여줌
+    const open = tankOpen(t), tierName = TIERS.find(x => x.id === t.tier).name, n = doneCount(t.id);
+    if (!tierUnlocked(t.tier) && t.tier === 'modern' && !tierUnlocked('mid')) continue;   // 두 단계 위는 아직 안 보여줌
     const card = document.createElement('button');
-    card.className = 'tank-card' + (t.ready && unlocked ? '' : ' locked') + (pendingTank === t.id ? ' selected' : '');
+    card.className = 'tank-card' + (t.ready && open ? '' : ' locked') + (pendingTank === t.id ? ' selected' : '');
     card.innerHTML = `<div class="thumb">${THUMBS[t.id] || THUMBS.generic}</div><h2>${t.name}</h2>
       <div class="desc">${tierName} · ${t.country} · ${t.year}년${t.nick ? ' · ' + t.nick : ''}</div>
-      <div class="note">${!unlocked ? '🔒 ' + TIERS.find(x => x.id === t.tier).need.replace('basic', '초급').replace('mid', '중급') + ' 1대 완성 시 해금' : t.ready ? '' : '모델 준비 중'}</div>`;
-    card.disabled = !(t.ready && unlocked);
+      <div class="note">${!open ? lockNote(t) : !t.ready ? '모델 준비 중' : n ? `✅ ${n}대 완성 · 다시 만들기` : nt === t ? '⭐ 다음 차례' : ''}</div>`;
+    card.disabled = !(t.ready && open);
     card.addEventListener('click', () => { pendingTank = t.id; renderSelect(); });
     list.appendChild(card);
   }
@@ -1248,7 +1394,7 @@ function renderSelect() {
 $('#btn-select').addEventListener('click', () => {
   if (!pendingTank) return;
   if (state.tank !== pendingTank) {
-    state.tank = pendingTank; state.attached = []; state.decor = defaultDecor();
+    state.tank = pendingTank; state.attached = []; state.decor = defaultDecor(pendingTank);
     state.build = { stage: 1, startWeek: weekKey(), evaluated: [], finish: [], status: 'building' };
   }
   save(); enterGarage();
@@ -1257,7 +1403,7 @@ $('#btn-select').addEventListener('click', () => {
 /* =====================================================================
    5. 화면: 차고(홈)
    ===================================================================== */
-const parts = () => PZ4_PARTS;   // 1단계는 4호 전차만 실제 모델
+const parts = () => layoutOf(state.tank).parts;   // 지금 전차의 부품 목록 (전차를 고르기 전에는 4호 전차)
 function enterGarage() {
   ensureToday(); evaluateUnlocks();
   buildTank(parts()); applyAttached(); applyDecor(state.decor);
@@ -1590,12 +1736,21 @@ function decalMesh(w, h) {
 }
 function ensureDecals() {
   if (decals.ready) return;
-  // PlaneGeometry는 +Z를 향함 → 우측(+Z)은 그대로, 좌측은 180° 돌림. 포탑 쉬르첸의 기울기(±0.08)만큼 맞춤
-  const face = s => (s > 0 ? 0 : Math.PI);
-  decals.number = [-1, 1].map(s => { const m = decalMesh(0.8, 0.4); m.position.set(-0.55, 0.40, s * 1.43); m.rotation.y = face(s) - s * 0.08; turret.add(m); return m; });
-  decals.national = [-1, 1].map(s => { const m = decalMesh(0.6, 0.3); m.position.set(1.4, 0.75, s * 1.55); m.rotation.y = face(s); tank.add(m); return m; });
-  decals.unit = [-1, 1].map(s => { const m = decalMesh(0.6, 0.3); m.position.set(-1.6, 0.75, s * 1.55); m.rotation.y = face(s); tank.add(m); return m; });
+  decals.number = [-1, 1].map(() => { const m = decalMesh(0.8, 0.4); turret.add(m); return m; });
+  decals.national = [-1, 1].map(() => { const m = decalMesh(0.6, 0.3); tank.add(m); return m; });
+  decals.unit = [-1, 1].map(() => { const m = decalMesh(0.6, 0.3); tank.add(m); return m; });
   decals.ready = true;
+}
+// 전차별 마킹 자리·포구 끝. PlaneGeometry는 +Z를 향함 → 우측(+Z)은 그대로, 좌측은 180° 돌림
+// [x, y, z, 옆 기울기, 위로 기울기]: 옆 기울기는 포탑 쉬르첸 같은 비스듬한 면, 위로 기울기는 T-34 경사 장갑
+function placeDecals() {
+  ensureDecals();
+  const L = layoutOf(state.tank);
+  MUZZLE_TIP.fromArray(L.muzzle);
+  for (const k of ['number', 'national', 'unit']) {
+    const [x, y, z, ry, rx] = L.decal[k];
+    decals[k].forEach((m, i) => { const s = i ? 1 : -1; m.position.set(x, y, s * z); m.rotation.set(-s * rx, (s > 0 ? 0 : Math.PI) - s * ry, 0); });
+  }
 }
 function applyDecor(d) {
   ensureDecals();
@@ -1654,7 +1809,7 @@ function startCeremony() {
   // 남은 부품은 완성 검수에서 마무리 (회색은 그대로 둔다 — 과목 편식의 흔적)
   for (const p of parts()) if (!state.attached.some(a => a.id === p.id)) { state.attached.push({ id: p.id, ok: true }); showPart(p.id, true, false); }
   save();
-  const wheels = []; for (const [id, v] of partObjects) if (/^(bogie|roller|sprocket|idler)/.test(id)) v.obj.traverse(o => { if (o.isMesh) wheels.push(o); });
+  const wheels = []; for (const [id, v] of partObjects) if (/^(bogie|road|vvss|roller|sprocket|idler)/.test(id)) v.obj.traverse(o => { if (o.isMesh && o.geometry.type === 'CylinderGeometry') wheels.push(o); });
   cere = { phase: 'intro', t: 0, wheels, startRot: tank.rotation.y, turretBase: turret.rotation.y };
   const t = TANKS.find(x => x.id === state.tank);
   $('#cere-title').textContent = `${t.name} 완성!`; $('#cere-title').classList.add('pop');
@@ -1697,14 +1852,14 @@ function snapshotThumb() {                              // 가운데 구도로 �
 }
 function registerToGarage() {
   const t = TANKS.find(x => x.id === state.tank);
-  const before = { basic: tierUnlocked('basic'), mid: tierUnlocked('mid'), modern: tierUnlocked('modern') };
+  const before = { basic: tierUnlocked('basic'), mid: tierUnlocked('mid'), modern: tierUnlocked('modern') }, beforeNext = nextTank();
   state.garage.push({ tank: state.tank, month: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`, decor: { ...state.decor }, grey: state.attached.filter(a => !a.ok).length, thumb: snapshotThumb(), completedAt: Date.now() });
-  const newly = TIERS.find(x => !before[x.id] && tierUnlocked(x.id));
+  const newly = TIERS.find(x => !before[x.id] && tierUnlocked(x.id)), nt = nextTank(), openedTank = nt && nt !== beforeNext ? nt : null;
   // 새 조립 준비: 전차 선택으로
   state.tank = null; state.attached = []; state.decor = defaultDecor();
   state.build = { stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' };
   save(); cere = null; tank.rotation.y = 0;
-  alert(newly ? `🎉 ${newly.name} 전차가 열렸어요! 다음 전차를 골라요.` : `${t.name}이(가) 차고에 등록됐어요. 다음 전차를 골라요.`);
+  alert(newly ? `🎉 ${newly.name} 전차가 열렸어요!${openedTank ? ` 다음 차례는 ${openedTank.name}!` : ''}` : openedTank ? `🎉 ${t.name} 등록! 이제 ${openedTank.name}이(가) 열렸어요.` : `${t.name}이(가) 차고에 등록됐어요. 다음 전차를 골라요.`);
   pendingTank = null; buildTank(parts()); applyAttached(); applyDecor(state.decor); renderSelect(); show('select');
 }
 
@@ -1727,9 +1882,9 @@ function enterList() {
     const wrap = document.createElement('div'); wrap.innerHTML = `<h3>${tier.name} ${tierUnlocked(tier.id) ? '' : '🔒'}</h3>`;
     const grid = document.createElement('div'); grid.className = 'gcards';
     for (const t of TANKS.filter(x => x.tier === tier.id)) {
-      const n = state.garage.filter(g => g.tank === t.id).length;
+      const n = doneCount(t.id);
       const c = document.createElement('div'); c.className = 'gcard' + (n ? '' : ' locked');
-      c.innerHTML = `<div class="gthumb">${THUMBS[t.id] || THUMBS.generic}</div><b>${t.name}</b><small>${t.country} · ${t.year}년${n ? ` · ${n}대 완성` : tierUnlocked(tier.id) ? (t.ready ? ' · 미완성' : ' · 모델 준비 중') : ' · 잠김'}</small>`;
+      c.innerHTML = `<div class="gthumb">${THUMBS[t.id] || THUMBS.generic}</div><b>${t.name}</b><small>${t.country} · ${t.year}년${n ? ` · ${n}대 완성` : tankOpen(t) ? (t.ready ? ' · 미완성' : ' · 모델 준비 중') : ' · 잠김'}</small>`;
       grid.appendChild(c);
     }
     wrap.appendChild(grid); body.appendChild(wrap);
