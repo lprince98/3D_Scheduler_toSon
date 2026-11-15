@@ -1359,24 +1359,20 @@ const THUMBS = {
   m4:  `<svg viewBox="0 0 100 50"><rect x="10" y="32" width="80" height="11" rx="5" fill="#333"/><rect x="10" y="16" width="80" height="17" rx="2" fill="#6b6a4a"/><ellipse cx="50" cy="14" rx="15" ry="8" fill="#7a7955"/><rect x="60" y="12" width="32" height="3" fill="#4a4a48"/>${[22,30,42,50,62,70].map(x=>`<circle cx="${x}" cy="37" r="3.5" fill="#7a7955"/>`).join('')}</svg>`,
 };
 let pendingTank = null;
-// 해금: 목록 순서대로 한 대씩. 앞 전차를 완성하면 다음 전차가 열리고, 한 등급을 모두 완성하면 다음 등급
-// (4호 전차 → T-34 → M4 셔먼 → 티거 I → …). 한 번 완성한 전차는 언제든 다시 만들 수 있음
+// 해금: 열린 등급의 전차는 모두 직접 골라 만들 수 있고, 그 등급을 모두 완성하면 다음 등급이 열림
+// (초급 4호 전차·T-34·M4 셔먼 → 중급 → 현대). 한 번 완성한 전차는 언제든 다시 만들 수 있음
 const doneCount = id => state.garage.filter(g => g.tank === id).length;
 const tierUnlocked = tier => { const t = TIERS.find(x => x.id === tier); return !t.need || TANKS.filter(x => x.tier === t.need).every(x => doneCount(x.id) > 0); };
-function tankOpen(t) {
-  const i = TANKS.indexOf(t);
-  return tierUnlocked(t.tier) && (i === 0 || doneCount(t.id) > 0 || doneCount(TANKS[i - 1].id) > 0);
-}
-const nextTank = () => TANKS.find(t => t.ready && tankOpen(t) && !doneCount(t.id)) || null;   // 다음 차례 (아직 안 만든 전차)
+const tankOpen = t => tierUnlocked(t.tier);
+const newTanks = () => TANKS.filter(t => t.ready && tankOpen(t) && !doneCount(t.id));   // 열렸지만 아직 안 만든 전차
 function lockNote(t) {
-  if (!tierUnlocked(t.tier)) { const need = TIERS.find(x => x.id === TIERS.find(y => y.id === t.tier).need); return `🔒 ${need.name} 전차를 모두 완성하면 열려요`; }
-  return `🔒 ${TANKS[TANKS.indexOf(t) - 1].name}을(를) 완성하면 열려요`;
+  const need = TIERS.find(x => x.id === TIERS.find(y => y.id === t.tier).need);
+  return `🔒 ${need.name} 전차를 모두 완성하면 열려요`;
 }
 function renderSelect() {
   const list = $('#tank-list'); list.innerHTML = '';
-  const nt = nextTank();
-  if (!pendingTank && nt) pendingTank = nt.id;                 // 다음 차례 전차를 미리 골라 둠
-  $('#select-sub').textContent = nt ? `다음 차례는 ${nt.name}! 숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.` : '만든 전차를 다시 만들 수 있어요. 새 전차는 준비 중이에요.';
+  const fresh = newTanks();
+  $('#select-sub').textContent = fresh.length ? `만들 전차를 골라요! (아직 안 만든 전차 ${fresh.length}대) 숙제를 하나 끝낼 때마다 부품이 하나씩 붙습니다.` : '만든 전차를 다시 만들 수 있어요. 새 전차는 준비 중이에요.';
   for (const t of TANKS) {
     const open = tankOpen(t), tierName = TIERS.find(x => x.id === t.tier).name, n = doneCount(t.id);
     if (!tierUnlocked(t.tier) && t.tier === 'modern' && !tierUnlocked('mid')) continue;   // 두 단계 위는 아직 안 보여줌
@@ -1384,7 +1380,7 @@ function renderSelect() {
     card.className = 'tank-card' + (t.ready && open ? '' : ' locked') + (pendingTank === t.id ? ' selected' : '');
     card.innerHTML = `<div class="thumb">${THUMBS[t.id] || THUMBS.generic}</div><h2>${t.name}</h2>
       <div class="desc">${tierName} · ${t.country} · ${t.year}년${t.nick ? ' · ' + t.nick : ''}</div>
-      <div class="note">${!open ? lockNote(t) : !t.ready ? '모델 준비 중' : n ? `✅ ${n}대 완성 · 다시 만들기` : nt === t ? '⭐ 다음 차례' : ''}</div>`;
+      <div class="note">${!open ? lockNote(t) : !t.ready ? '모델 준비 중' : n ? `✅ ${n}대 완성 · 다시 만들기` : '⭐ 아직 안 만든 전차'}</div>`;
     card.disabled = !(t.ready && open);
     card.addEventListener('click', () => { pendingTank = t.id; renderSelect(); });
     list.appendChild(card);
@@ -1852,14 +1848,14 @@ function snapshotThumb() {                              // 가운데 구도로 �
 }
 function registerToGarage() {
   const t = TANKS.find(x => x.id === state.tank);
-  const before = { basic: tierUnlocked('basic'), mid: tierUnlocked('mid'), modern: tierUnlocked('modern') }, beforeNext = nextTank();
+  const before = { basic: tierUnlocked('basic'), mid: tierUnlocked('mid'), modern: tierUnlocked('modern') };
   state.garage.push({ tank: state.tank, month: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`, decor: { ...state.decor }, grey: state.attached.filter(a => !a.ok).length, thumb: snapshotThumb(), completedAt: Date.now() });
-  const newly = TIERS.find(x => !before[x.id] && tierUnlocked(x.id)), nt = nextTank(), openedTank = nt && nt !== beforeNext ? nt : null;
+  const newly = TIERS.find(x => !before[x.id] && tierUnlocked(x.id)), left = newTanks().filter(x => x.tier === TANKS.find(y => y.id === state.tank).tier);
   // 새 조립 준비: 전차 선택으로
   state.tank = null; state.attached = []; state.decor = defaultDecor();
   state.build = { stage: 1, startWeek: null, evaluated: [], finish: [], status: 'building' };
   save(); cere = null; tank.rotation.y = 0;
-  alert(newly ? `🎉 ${newly.name} 전차가 열렸어요!${openedTank ? ` 다음 차례는 ${openedTank.name}!` : ''}` : openedTank ? `🎉 ${t.name} 등록! 이제 ${openedTank.name}이(가) 열렸어요.` : `${t.name}이(가) 차고에 등록됐어요. 다음 전차를 골라요.`);
+  alert(newly ? `🎉 ${newly.name} 전차가 열렸어요! 다음 전차를 골라요.` : left.length ? `${t.name}이(가) 차고에 등록됐어요. ${left.map(x => x.name).join('·')}까지 만들면 다음 등급이 열려요!` : `${t.name}이(가) 차고에 등록됐어요. 다음 전차를 골라요.`);
   pendingTank = null; buildTank(parts()); applyAttached(); applyDecor(state.decor); renderSelect(); show('select');
 }
 
